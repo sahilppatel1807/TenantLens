@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
+  const paidSignup = searchParams.get("plan") === "paid";
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -55,7 +57,7 @@ export function RegisterPage() {
         return;
       }
       if (data.session) {
-        router.push("/dashboard");
+        router.push(paidSignup ? "/dashboard/billing?plan=paid" : "/dashboard");
         router.refresh();
         return;
       }
@@ -75,7 +77,10 @@ export function RegisterPage() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-accent hover:underline">
+          <Link
+            href={paidSignup ? "/login?plan=paid" : "/login"}
+            className="font-medium text-accent hover:underline"
+          >
             Log in
           </Link>
         </>

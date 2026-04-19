@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { UpgradeRequiredError } from "@/lib/billing/upgrade-required-error";
 import { Button } from "@/components/ui/button";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +14,7 @@ import {
 import { PropertyFormFields } from "@/components/PropertyFormFields";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/lib/store";
+import { startSubscriptionCheckout } from "@/lib/stripe/start-subscription-checkout";
 import {
   togglePropertyRequiredDocumentCategory,
   type DocumentCategory,
@@ -80,6 +83,18 @@ export function EditPropertyDialog({
       toast({ title: "Property updated", description: `${address.trim()}, ${suburb.trim()}` });
       setOpen(false);
     } catch (err) {
+      if (err instanceof UpgradeRequiredError) {
+        toast({
+          title: "Subscription required",
+          description: `${err.message} After you subscribe, save this change again.`,
+          action: (
+            <ToastAction altText="Subscribe with Stripe" onClick={() => void startSubscriptionCheckout()}>
+              Subscribe
+            </ToastAction>
+          ),
+        });
+        return;
+      }
       toast({
         title: "Could not update property",
         description: err instanceof Error ? err.message : "Unknown error",

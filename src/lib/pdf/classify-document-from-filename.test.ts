@@ -67,4 +67,20 @@ describe("classifyDocumentFromFilename", () => {
   it("classifies dl in remainder after name strip as photo_id", () => {
     expect(classifyDocumentFromFilename("Sahil_dl.pdf", "Sahil")).toBe("photo_id");
   });
+
+  it("accepts mixed space/underscore after applicant prefix", () => {
+    expect(classifyDocumentFromFilename("jason bank_statement.pdf", "Jason")).toBe("bank_statement");
+  });
+
+  it("accepts space-separated tokens for applicant + document type", () => {
+    expect(classifyDocumentFromFilename("jason bank statement jan.pdf", "Jason")).toBe("bank_statement");
+  });
+
+  it("accepts common bank-statement misspelling satement", () => {
+    expect(classifyDocumentFromFilename("jason_bank satement.pdf", "Jason")).toBe("bank_statement");
+  });
+
+  it("matches applicant prefix case-insensitively", () => {
+    expect(classifyDocumentFromFilename("JASON_Payslip.pdf", "jason")).toBe("payslip");
+  });
 });

@@ -11,12 +11,13 @@ import {
 } from "react";
 import type { Applicant, ApplicantStatus, Property } from "./types";
 import { getSupabaseBrowserClient } from "./supabase/browser";
+import { UpgradeRequiredError, isUpgradeRequiredPayload } from "./billing/upgrade-required-error";
+import { serializePropertyForApi } from "./billing/property-payload";
 import {
   applicantToInsert,
   applicantToUpdateRowPartial,
   normalizeDocumentKeys,
-  propertyToInsert,
-  propertyToUpdateRow,
+  type PropertyRow,
   rowToApplicant,
   rowToProperty,
 } from "./db/mappers";
@@ -139,11 +140,43 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
 
-      const insert = propertyToInsert(p, user.id);
-      const { data, error } = await supabase.from("properties").insert(insert).select("*").single();
-      if (error) throw toError(error);
+      let res: Response;
+      try {
+        res = await fetch("/api/properties", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(serializePropertyForApi(p)),
+        });
+      } catch {
+        throw new Error("Network error — check your connection and try again.");
+      }
+
+      const raw = await res.text();
+      let data: unknown;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(res.ok ? "Invalid response from server." : `Could not save property (${res.status}).`);
+      }
+
+      if (!res.ok) {
+        if (res.status === 403 && isUpgradeRequiredPayload(data)) {
+          throw new UpgradeRequiredError(
+            data.message,
+            data.activePropertyCount,
+            data.billablePropertyCount,
+          );
+        }
+        const msg =
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : `Could not save property (${res.status}).`;
+        throw new Error(msg);
+      }
+
       await refreshData();
-      return rowToProperty(data);
+      return rowToProperty(data as PropertyRow);
     },
     [supabase, refreshData],
   );
@@ -156,17 +189,43 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
 
-      const patch = propertyToUpdateRow(p);
-      const { data, error } = await supabase
-        .from("properties")
-        .update(patch)
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .select("*")
-        .single();
-      if (error) throw toError(error);
+      let res: Response;
+      try {
+        res = await fetch(`/api/properties/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(serializePropertyForApi(p)),
+        });
+      } catch {
+        throw new Error("Network error — check your connection and try again.");
+      }
+
+      const raw = await res.text();
+      let data: unknown;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(res.ok ? "Invalid response from server." : `Could not update property (${res.status}).`);
+      }
+
+      if (!res.ok) {
+        if (res.status === 403 && isUpgradeRequiredPayload(data)) {
+          throw new UpgradeRequiredError(
+            data.message,
+            data.activePropertyCount,
+            data.billablePropertyCount,
+          );
+        }
+        const msg =
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : `Could not update property (${res.status}).`;
+        throw new Error(msg);
+      }
+
       await refreshData();
-      return rowToProperty(data);
+      return rowToProperty(data as PropertyRow);
     },
     [supabase, refreshData],
   );

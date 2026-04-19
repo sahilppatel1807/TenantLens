@@ -13,6 +13,10 @@ const FILENAME_RULES: FilenameRule[] = [
       "bank statement",
       "bank_statement",
       "bank statements",
+      // Common filename misspelling ("statement" → "satement")
+      "bank satement",
+      "bank_satement",
+      "bank satements",
       "bank stmt",
       "statement of account",
       "account statement",
@@ -85,6 +89,11 @@ function splitFilenameStemAndExt(filename: string): { stem: string; extWithDot: 
   return { stem: base.slice(0, dot), extWithDot: base.slice(dot) };
 }
 
+/** Underscores and whitespace separate logical tokens (e.g. `jason bank_statement`, `jason bank statement`). */
+function splitStemIntoParts(stem: string): string[] {
+  return stem.split(/[_\s]+/).filter((p) => p.length > 0);
+}
+
 function normalizeNameForMatch(name: string): string {
   return name
     .trim()
@@ -146,7 +155,7 @@ export function classifyDocumentFromFilename(
   if (direct !== "unknown") return direct;
 
   const { stem, extWithDot } = splitFilenameStemAndExt(raw);
-  const parts = stem.split("_").filter((p) => p.length > 0);
+  const parts = splitStemIntoParts(stem);
   if (parts.length < 2) return "unknown";
 
   const hasApplicant = Boolean(applicantName?.trim());

@@ -37,7 +37,7 @@ function normalizeRentalHistory(raw: unknown): RentalHistory {
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80";
 
-type PropertyRow = {
+export type PropertyRow = {
   id: string;
   user_id: string;
   address: string;

@@ -205,7 +205,7 @@ describe("scoreApplicant", () => {
       yearsRenting: 0,
       onTimePaymentsPct: 0,
       referenceQuality: "none" as const,
-      monthsRenting: null as const,
+      monthsRenting: null,
     };
     expect(
       scoreRecommendationForHistory({

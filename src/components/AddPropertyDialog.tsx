@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { UpgradeRequiredError } from "@/lib/billing/upgrade-required-error";
 import { PropertyFormFields } from "@/components/PropertyFormFields";
 import { Button } from "@/components/ui/button";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,7 @@ import {
   type DocumentCategory,
 } from "@/lib/document-categories";
 import { useData } from "@/lib/store";
+import { startSubscriptionCheckout } from "@/lib/stripe/start-subscription-checkout";
 import { type DocumentKey, type Property } from "@/lib/types";
 
 export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) => {
@@ -45,27 +48,47 @@ export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) =>
   const toggleRequiredDocCategory = (category: DocumentCategory) =>
     setDocs((prev) => togglePropertyRequiredDocumentCategory(prev, category));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address.trim() || !suburb.trim() || !city.trim() || !weeklyRent) {
       toast({ title: "Missing details", description: "Address, suburb, city and rent are required." });
       return;
     }
-    addProperty({
-      address: address.trim(),
-      suburb: suburb.trim(),
-      city: city.trim(),
-      weeklyRent: Number(weeklyRent),
-      bedrooms: Number(bedrooms) || 0,
-      bathrooms: Number(bathrooms) || 0,
-      parking: Number(parking) || 0,
-      status,
-      imageUrl: imageUrl.trim(),
-      requiredDocuments: docs,
-    });
-    toast({ title: "Property added", description: `${address}, ${suburb}` });
-    reset();
-    setOpen(false);
+    try {
+      await addProperty({
+        address: address.trim(),
+        suburb: suburb.trim(),
+        city: city.trim(),
+        weeklyRent: Number(weeklyRent),
+        bedrooms: Number(bedrooms) || 0,
+        bathrooms: Number(bathrooms) || 0,
+        parking: Number(parking) || 0,
+        status,
+        imageUrl: imageUrl.trim(),
+        requiredDocuments: docs,
+      });
+      toast({ title: "Property added", description: `${address}, ${suburb}` });
+      reset();
+      setOpen(false);
+    } catch (err) {
+      if (err instanceof UpgradeRequiredError) {
+        toast({
+          title: "Subscription required",
+          description: `${err.message} After you subscribe, add this listing again.`,
+          action: (
+            <ToastAction altText="Subscribe with Stripe" onClick={() => void startSubscriptionCheckout()}>
+              Subscribe
+            </ToastAction>
+          ),
+        });
+        return;
+      }
+      toast({
+        title: "Could not add property",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

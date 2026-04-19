@@ -16,6 +16,9 @@ export const SiteHeader = () => (
         <a href="#workflow" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
           Workflow
         </a>
+        <a href="#pricing" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          Pricing
+        </a>
       </nav>
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="sm">

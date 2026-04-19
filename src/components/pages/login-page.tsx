@@ -48,10 +48,10 @@ export function LoginPage() {
         return;
       }
       const raw = searchParams.get("next");
-      const next =
-        raw && raw.startsWith("/dashboard") && !raw.includes("//") && !raw.includes(":")
-          ? raw
-          : "/dashboard";
+      const paidIntent = searchParams.get("plan") === "paid";
+      const fromNext =
+        raw && raw.startsWith("/dashboard") && !raw.includes("//") && !raw.includes(":") ? raw : null;
+      const next = fromNext ?? (paidIntent ? "/dashboard/billing?plan=paid" : "/dashboard");
       router.push(next);
       router.refresh();
     } finally {
@@ -66,7 +66,10 @@ export function LoginPage() {
       footer={
         <>
           Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-medium text-accent hover:underline">
+          <Link
+            href={searchParams.get("plan") === "paid" ? "/register?plan=paid" : "/register"}
+            className="font-medium text-accent hover:underline"
+          >
             Sign up
           </Link>
         </>

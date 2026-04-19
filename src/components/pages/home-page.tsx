@@ -204,25 +204,94 @@ export function HomePage() {
           </div>
         </section>
 
-        <section className="border-t border-border/60 py-20">
+        <section id="pricing" className="border-t border-border/60 py-20 lg:py-28">
           <div className="container">
-            <div className="relative overflow-hidden rounded-2xl gradient-hero p-10 text-center shadow-float md:p-16">
-              <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
-              <h2 className="text-balance text-3xl font-bold tracking-tight text-primary-foreground md:text-4xl">
-                Stop drowning in PDFs. Start shortlisting.
-              </h2>
-              <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
-                Give your property managers their afternoons back.
-              </p>
-              <div className="mt-8 flex flex-wrap justify-center gap-3">
-                <Button asChild variant="accent" size="xl">
-                  <Link href="/register">
-                    Create free account <ArrowRight />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="xl" className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
-                  <Link href="/login">Log in</Link>
-                </Button>
+            <div className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl gradient-hero shadow-float">
+              <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-accent/25 blur-3xl" />
+              <div className="absolute -bottom-32 -left-24 h-64 w-64 rounded-full bg-primary-foreground/10 blur-3xl" />
+              <div className="relative px-6 py-10 md:px-10 md:py-12">
+                <div className="mx-auto max-w-2xl text-center">
+                  <span className="text-sm font-semibold uppercase tracking-wider text-primary-foreground/70">
+                    Pricing
+                  </span>
+                  <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight text-primary-foreground md:text-4xl">
+                    Simple pricing for growing agencies
+                  </h2>
+                  <p className="mt-3 text-pretty text-base text-primary-foreground/85">
+                    Start free with 3 listings. Only pay when you grow.
+                  </p>
+                </div>
+                <div className="mx-auto mt-10 grid max-w-3xl gap-6 md:mt-12 md:grid-cols-2 md:items-stretch">
+                  <article className="flex h-full flex-col rounded-2xl border border-border/80 bg-card p-6 text-left shadow-soft md:p-8">
+                    <span className="inline-flex w-fit rounded-full border border-border bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground">
+                      Free
+                    </span>
+                    <div className="mt-5 flex flex-wrap items-end gap-x-2 gap-y-1">
+                      <span className="text-4xl font-extrabold tracking-tight text-foreground">Free</span>
+                      <span className="pb-1 text-sm font-medium text-muted-foreground">3 active listings included</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      Get started quickly and review applicants in minutes.
+                    </p>
+                    <ul className="mt-6 flex flex-1 flex-col gap-3 text-sm text-muted-foreground">
+                      <li className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                        <span>3 active listings</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                        <span>Unlimited applicants</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                        <span>Full scoring & document review</span>
+                      </li>
+                    </ul>
+                    <div className="mt-8">
+                      <Button asChild variant="secondary" size="lg" className="w-full">
+                        <Link href="/register">
+                          Start free <ArrowRight />
+                        </Link>
+                      </Button>
+                    </div>
+                  </article>
+                  <article className="flex h-full flex-col rounded-2xl border border-accent/50 bg-card p-6 text-left shadow-md ring-1 ring-accent/25 md:p-8">
+                    <span className="inline-flex w-fit rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-sm">
+                      Most popular
+                    </span>
+                    <div className="mt-5 flex flex-wrap items-end gap-x-2 gap-y-1">
+                      <span className="text-4xl font-extrabold tracking-tight text-accent">$15</span>
+                      <span className="pb-1 text-sm font-medium text-muted-foreground">per active property / month</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      Pay as you grow. Only pay for listings that are active.
+                    </p>
+                    <ul className="mt-6 flex flex-1 flex-col gap-3 text-sm text-muted-foreground">
+                      <li className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                        <span>Unlimited applicants</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                        <span>Pay only for active listings</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                        <span>Cancel anytime</span>
+                      </li>
+                    </ul>
+                    <div className="mt-8">
+                      <Button asChild variant="hero" size="lg" className="w-full">
+                        <Link href="/register?plan=paid">
+                          Get started <ArrowRight />
+                        </Link>
+                      </Button>
+                    </div>
+                  </article>
+                </div>
+                <p className="mx-auto mt-8 max-w-3xl text-center text-xs text-primary-foreground/70">
+                  No base fee. No surprises.
+                </p>
               </div>
             </div>
           </div>

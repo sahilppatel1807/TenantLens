@@ -12,6 +12,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 const navItems = [
   { href: "/dashboard", label: "Properties", end: true as const },
   { href: "/dashboard/applicants", label: "Applicants", end: false as const },
+  { href: "/dashboard/billing", label: "Billing", end: false as const },
 ] as const;
 
 function navLinkActive(pathname: string, href: string, end: boolean) {

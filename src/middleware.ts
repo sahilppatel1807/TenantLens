@@ -42,8 +42,14 @@ export async function middleware(request: NextRequest) {
 
   if (user && (path === "/login" || path === "/register")) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/dashboard";
-    redirectUrl.searchParams.delete("next");
+    if (path === "/register" && request.nextUrl.searchParams.get("plan") === "paid") {
+      redirectUrl.pathname = "/dashboard/billing";
+      redirectUrl.searchParams.delete("next");
+      redirectUrl.searchParams.set("plan", "paid");
+    } else {
+      redirectUrl.pathname = "/dashboard";
+      redirectUrl.searchParams.delete("next");
+    }
     return NextResponse.redirect(redirectUrl);
   }
 
