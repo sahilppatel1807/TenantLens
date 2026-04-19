@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "./Logo";
 
@@ -19,10 +19,10 @@ export const SiteHeader = () => (
       </nav>
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="sm">
-          <Link to="/login">Log in</Link>
+          <Link href="/login">Log in</Link>
         </Button>
         <Button asChild size="sm">
-          <Link to="/register">Start free</Link>
+          <Link href="/register">Start free</Link>
         </Button>
       </div>
     </div>

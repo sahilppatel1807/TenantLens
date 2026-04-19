@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Bath, BedDouble, Bookmark, Car, MapPin, Users } from "lucide-react";
 import type { Property } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ const statusStyles: Record<Property["status"], string> = {
 
 export const PropertyCard = ({ property, applicantCount, topScore, shortlistedCount = 0 }: PropertyCardProps) => (
   <Link
-    to={`/dashboard/properties/${property.id}`}
+    href={`/dashboard/properties/${property.id}`}
     className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elegant"
   >
     <div className="relative aspect-[16/10] overflow-hidden bg-secondary">

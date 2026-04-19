@@ -1,0 +1,235 @@
+import Image from "next/image";
+import Link from "next/link";
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileSearch,
+  Gauge,
+  ListChecks,
+  ScanSearch,
+  Scale,
+  Sparkles,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
+import heroImage from "@/assets/hero-illustration.jpg";
+
+const features = [
+  {
+    icon: ListChecks,
+    title: "Document completeness",
+    body: "Define a checklist per property. See instantly what's missing — passport, payslips, references, rental history.",
+  },
+  {
+    icon: Gauge,
+    title: "Transparent scoring",
+    body: "A simple 100-point score per applicant. No black box — every point is explainable to your landlords.",
+  },
+  {
+    icon: Scale,
+    title: "Side-by-side compare",
+    body: "Rank applicants by score and compare income, history and completeness in one view.",
+  },
+  {
+    icon: FileSearch,
+    title: "Quick review",
+    body: "Open one applicant and see everything: documents, missing items, summary. Decide in minutes, not hours.",
+  },
+  {
+    icon: ScanSearch,
+    title: "Income vs rent",
+    body: "Income is evaluated relative to weekly rent — strong (3×), medium (2–3×), low (<2×). Sensible by default.",
+  },
+  {
+    icon: Sparkles,
+    title: "Built for agencies",
+    body: "Familiar property cards, clean dashboard, no learning curve. Your team is productive on day one.",
+  },
+];
+
+const scoreBreakdown = [
+  { label: "Document completeness", points: 50, color: "bg-primary" },
+  { label: "Income vs rent", points: 30, color: "bg-accent" },
+  { label: "Rental history", points: 20, color: "bg-tier-good" },
+];
+
+const tiers = [
+  { tier: "Good", range: "75 – 100", desc: "Complete, well-documented, strong income.", classes: "bg-tier-good-soft text-tier-good border-tier-good/20" },
+  { tier: "Average", range: "50 – 74", desc: "Some gaps or moderate income coverage.", classes: "bg-tier-average-soft text-tier-average border-tier-average/30" },
+  { tier: "Bad", range: "0 – 49", desc: "Significant gaps or insufficient income.", classes: "bg-tier-bad-soft text-tier-bad border-tier-bad/20" },
+];
+
+export function HomePage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <SiteHeader />
+
+      <main>
+        <section className="relative overflow-hidden">
+          <div className="absolute inset-0 -z-10 gradient-subtle" />
+          <div className="absolute right-0 top-0 -z-10 h-[600px] w-[600px] rounded-full bg-accent/10 blur-3xl" />
+          <div className="container grid gap-12 py-20 lg:grid-cols-2 lg:items-center lg:py-28">
+            <div className="animate-fade-in-up space-y-6">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-xs">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                Built for real estate agencies
+              </span>
+              <h1 className="text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+                Review rental applicants in <span className="text-accent">minutes</span>, not hours.
+              </h1>
+              <p className="max-w-xl text-balance text-lg text-muted-foreground">
+                TenantLens checks documents, scores applicants out of 100, and lets you compare them side-by-side.
+                A clear, explainable decision-support tool for property managers.
+              </p>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Button asChild variant="hero" size="xl">
+                  <Link href="/register">
+                    Start free <ArrowRight />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="xl">
+                  <a href="#scoring">See how scoring works</a>
+                </Button>
+              </div>
+              <ul className="flex flex-wrap gap-x-6 gap-y-2 pt-4 text-sm text-muted-foreground">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> No credit card</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Setup in 2 minutes</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Cancel anytime</li>
+              </ul>
+            </div>
+            <div className="relative animate-fade-in">
+              <div className="absolute -inset-4 rounded-3xl bg-gradient-to-tr from-accent/20 to-primary/20 blur-2xl" />
+              <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-float">
+                <Image
+                  src={heroImage}
+                  alt="TenantLens applicant review dashboard illustration"
+                  width={1408}
+                  height={1024}
+                  className="h-auto w-full"
+                  priority
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="features" className="border-t border-border/60 py-20 lg:py-28">
+          <div className="container">
+            <div className="mx-auto max-w-2xl text-center">
+              <span className="text-sm font-semibold uppercase tracking-wider text-accent">Features</span>
+              <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight md:text-4xl">
+                Everything you need to triage applicants fast
+              </h2>
+              <p className="mt-4 text-muted-foreground">
+                No bloat. No AI hype. Just the tools your team actually uses to make better calls.
+              </p>
+            </div>
+            <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {features.map((f) => (
+                <article
+                  key={f.title}
+                  className="group rounded-xl border border-border bg-card p-6 shadow-soft transition-all hover:-translate-y-1 hover:shadow-elegant"
+                >
+                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-accent-soft text-accent">
+                    <f.icon className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-semibold">{f.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="scoring" className="border-t border-border/60 bg-secondary/40 py-20 lg:py-28">
+          <div className="container grid gap-12 lg:grid-cols-2 lg:items-center">
+            <div>
+              <span className="text-sm font-semibold uppercase tracking-wider text-accent">Scoring</span>
+              <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight md:text-4xl">
+                A 100-point score you can explain to any landlord
+              </h2>
+              <p className="mt-4 text-muted-foreground">
+                We deliberately keep scoring simple. Three factors, clear weights, no surprises.
+              </p>
+              <div className="mt-8 space-y-4">
+                {scoreBreakdown.map((s) => (
+                  <div key={s.label} className="rounded-lg border border-border bg-card p-4 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{s.label}</span>
+                      <span className="text-sm font-semibold text-muted-foreground">{s.points} pts</span>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+                      <div className={`h-full ${s.color}`} style={{ width: `${s.points}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-4">
+              {tiers.map((t) => (
+                <div key={t.tier} className={`rounded-xl border p-6 ${t.classes}`}>
+                  <div className="flex items-baseline justify-between">
+                    <h3 className="text-2xl font-bold">{t.tier}</h3>
+                    <span className="text-sm font-semibold opacity-80">{t.range}</span>
+                  </div>
+                  <p className="mt-2 text-sm opacity-90">{t.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="workflow" className="border-t border-border/60 py-20 lg:py-28">
+          <div className="container">
+            <div className="mx-auto max-w-2xl text-center">
+              <span className="text-sm font-semibold uppercase tracking-wider text-accent">Workflow</span>
+              <h2 className="mt-3 text-balance text-3xl font-bold tracking-tight md:text-4xl">
+                From inbox chaos to a ranked shortlist
+              </h2>
+            </div>
+            <ol className="mt-14 grid gap-6 md:grid-cols-3">
+              {[
+                { n: "01", t: "Add a property", d: "Address, weekly rent, document checklist. 30 seconds." },
+                { n: "02", t: "Add applicants", d: "Upload their documents and basic details as they come in." },
+                { n: "03", t: "Review & decide", d: "See ranked applicants, compare side-by-side, shortlist the best." },
+              ].map((s) => (
+                <li key={s.n} className="rounded-xl border border-border bg-card p-6 shadow-soft">
+                  <span className="text-sm font-bold text-accent">{s.n}</span>
+                  <h3 className="mt-3 text-lg font-semibold">{s.t}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{s.d}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="border-t border-border/60 py-20">
+          <div className="container">
+            <div className="relative overflow-hidden rounded-2xl gradient-hero p-10 text-center shadow-float md:p-16">
+              <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-accent/20 blur-3xl" />
+              <h2 className="text-balance text-3xl font-bold tracking-tight text-primary-foreground md:text-4xl">
+                Stop drowning in PDFs. Start shortlisting.
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
+                Give your property managers their afternoons back.
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <Button asChild variant="accent" size="xl">
+                  <Link href="/register">
+                    Create free account <ArrowRight />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="xl" className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+                  <Link href="/login">Log in</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <SiteFooter />
+    </div>
+  );
+}

@@ -5,7 +5,7 @@ import type { ApplicantStatus } from "@/lib/types";
 
 interface Props {
   status: ApplicantStatus;
-  onChange: (s: ApplicantStatus) => void;
+  onChange: (s: ApplicantStatus) => void | Promise<void>;
   size?: "sm" | "md";
 }
 

@@ -1,5 +1,6 @@
-import { Mail, Phone } from "lucide-react";
+import { Mail, Pen, Phone } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 import { ScoreRing } from "./ScoreRing";
 import { TierBadge } from "./TierBadge";
 import { ApplicantStatusActions, ApplicantStatusBadge } from "./ApplicantStatusActions";
@@ -13,6 +14,7 @@ interface ApplicantRowProps {
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
   onClick?: (id: string) => void;
+  onEdit?: (id: string) => void;
   onStatusChange?: (id: string, status: ApplicantStatus) => void;
 }
 
@@ -23,6 +25,7 @@ export const ApplicantRow = ({
   selected,
   onToggleSelect,
   onClick,
+  onEdit,
   onStatusChange,
 }: ApplicantRowProps) => (
   <div
@@ -41,8 +44,24 @@ export const ApplicantRow = ({
     <span className="hidden w-6 text-center text-sm font-semibold text-muted-foreground sm:inline">#{rank}</span>
     <ScoreRing score={score.total} tier={score.tier} size={48} />
     <div className="min-w-0 flex-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <h4 className="truncate font-semibold text-foreground">{applicant.name}</h4>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <h4 className="truncate text-[15px] font-semibold leading-tight text-foreground">{applicant.name}</h4>
+        {onEdit && (
+          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="h-6 w-6 rounded-full"
+              aria-label={`Edit applicant ${applicant.name}`}
+              onClick={() => onEdit(applicant.id)}
+            >
+              <Pen className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
         <TierBadge tier={score.tier} />
         <ApplicantStatusBadge status={applicant.status} />
       </div>

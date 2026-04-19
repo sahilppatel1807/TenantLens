@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { Logo } from "./Logo";
 
 interface AuthLayoutProps {
@@ -11,7 +11,6 @@ interface AuthLayoutProps {
 
 export const AuthLayout = ({ title, subtitle, children, footer }: AuthLayoutProps) => (
   <div className="grid min-h-screen lg:grid-cols-2">
-    {/* Left — form */}
     <div className="flex flex-col px-6 py-8 lg:px-12">
       <Logo />
       <div className="flex flex-1 items-center justify-center py-12">
@@ -25,17 +24,16 @@ export const AuthLayout = ({ title, subtitle, children, footer }: AuthLayoutProp
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        <Link to="/" className="hover:text-foreground">← Back to home</Link>
+        <Link href="/" className="hover:text-foreground">← Back to home</Link>
       </p>
     </div>
 
-    {/* Right — visual */}
     <div className="relative hidden overflow-hidden gradient-hero lg:block">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(188_70%_50%/0.3),transparent_50%)]" />
       <div className="relative flex h-full flex-col justify-end p-12 text-primary-foreground">
         <blockquote className="space-y-4">
           <p className="text-balance text-2xl font-medium leading-snug">
-            "What used to take an afternoon now takes 15 minutes. Our team finally has time to actually talk to landlords."
+            &quot;What used to take an afternoon now takes 15 minutes. Our team finally has time to actually talk to landlords.&quot;
           </p>
           <footer className="text-sm text-primary-foreground/70">
             — Property Manager, Metro Realty

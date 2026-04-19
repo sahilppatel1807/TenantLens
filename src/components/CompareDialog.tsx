@@ -2,7 +2,7 @@ import { Check, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScoreRing } from "./ScoreRing";
 import { TierBadge } from "./TierBadge";
-import { scoreApplicant } from "@/lib/scoring";
+import { effectiveTenancyMonths, rentalBehaviorLabel, scoreApplicant } from "@/lib/scoring";
 import { DOCUMENT_LABELS, type Applicant, type Property } from "@/lib/types";
 
 interface CompareDialogProps {
@@ -79,20 +79,25 @@ export const CompareDialog = ({ open, onOpenChange, applicants, property }: Comp
                 <span key={a.id} className="text-sm font-semibold">{s.rentToIncomeRatio.toFixed(1)}x</span>
               ))}
             </Row>
-            <Row label="Years renting">
+            <Row label="Months renting">
               {scored.map(({ a }) => (
-                <span key={a.id} className="text-sm">{a.rentalHistory.yearsRenting} yrs</span>
+                <span key={a.id} className="text-sm">
+                  {effectiveTenancyMonths(a.rentalHistory)} mo
+                </span>
               ))}
             </Row>
-            <Row label="On-time %">
-              {scored.map(({ a }) => (
-                <span key={a.id} className="text-sm">{a.rentalHistory.onTimePaymentsPct}%</span>
-              ))}
-            </Row>
-            <Row label="References">
-              {scored.map(({ a }) => (
-                <span key={a.id} className="text-sm capitalize">{a.rentalHistory.referenceQuality}</span>
-              ))}
+            <Row label="Rental behavior">
+              {scored.map(({ a }) => {
+                const b = rentalBehaviorLabel(a.rentalHistory);
+                return (
+                  <span
+                    key={a.id}
+                    className={`text-sm font-semibold ${b === "Good" ? "text-tier-good" : "text-muted-foreground"}`}
+                  >
+                    {b}
+                  </span>
+                );
+              })}
             </Row>
 
             {/* Documents matrix */}
