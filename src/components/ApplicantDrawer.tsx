@@ -84,6 +84,14 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
   const submittedSet = new Set(applicant.submittedDocuments);
   const missingDocuments = property.requiredDocuments.filter((doc) => !submittedSet.has(doc));
   const submittedRequiredDocuments = property.requiredDocuments.filter((doc) => submittedSet.has(doc));
+  const hasIncomeDocumentNoFigure =
+    (!applicant.weeklyIncome || applicant.weeklyIncome <= 0) && submittedSet.has("proof_of_income");
+  const weeklyIncomeFromDocsLabel =
+    applicant.weeklyIncome && applicant.weeklyIncome > 0
+      ? `$${applicant.weeklyIncome} / week`
+      : hasIncomeDocumentNoFigure
+        ? "Not detected — try a payroll PDF export with selectable text (phone scans often have none)."
+        : "Not detected — upload a payslip";
   const hasKnownRentalDuration =
     (applicant.rentalHistory.monthsRenting != null && applicant.rentalHistory.monthsRenting > 0) ||
     applicant.rentalHistory.yearsRenting > 0;
@@ -169,21 +177,33 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
           });
         }
       }
+      // After PDF upload, `/api/applicant-pdfs/reanalyze-stored` already persisted weekly income,
+      // submitted documents, and rental fields from PDFs. Do not PATCH those from `latest` here —
+      // a stale `refreshData()` result would overwrite correct DB values with 0 / old lists.
       await updateApplicant(applicant.id, {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
         occupation: occupation.trim(),
-        weeklyIncome: hadPdfUpload ? latest.weeklyIncome : applicant.weeklyIncome,
-        submittedDocuments: hadPdfUpload ? latest.submittedDocuments : applicant.submittedDocuments,
-        rentalHistory: hadPdfUpload ? { ...latest.rentalHistory, notes: historyNotes.trim() || undefined } : {
-          yearsRenting: applicant.rentalHistory.yearsRenting,
-          onTimePaymentsPct: applicant.rentalHistory.onTimePaymentsPct,
-          referenceQuality: applicant.rentalHistory.referenceQuality,
-          notes: historyNotes.trim() || undefined,
-          monthsRenting: applicant.rentalHistory.monthsRenting,
-          recommendationSentiment: applicant.rentalHistory.recommendationSentiment,
-        },
+        ...(hadPdfUpload
+          ? {
+              rentalHistory: {
+                ...latest.rentalHistory,
+                notes: historyNotes.trim() || undefined,
+              },
+            }
+          : {
+              weeklyIncome: applicant.weeklyIncome,
+              submittedDocuments: applicant.submittedDocuments,
+              rentalHistory: {
+                yearsRenting: applicant.rentalHistory.yearsRenting,
+                onTimePaymentsPct: applicant.rentalHistory.onTimePaymentsPct,
+                referenceQuality: applicant.rentalHistory.referenceQuality,
+                notes: historyNotes.trim() || undefined,
+                monthsRenting: applicant.rentalHistory.monthsRenting,
+                recommendationSentiment: applicant.rentalHistory.recommendationSentiment,
+              },
+            }),
         notes: agentNotes.trim() || undefined,
       });
       toast({
@@ -395,6 +415,11 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
                 ${applicant.weeklyIncome}/wk against ${property.weeklyRent}/wk rent ·{" "}
                 <span className="font-semibold text-foreground">{score.rentToIncomeRatio.toFixed(1)}x</span>
               </p>
+              {hasIncomeDocumentNoFigure ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Proof of income is on file, but no amount was parsed from the PDF text layer.
+                </p>
+              ) : null}
             </section>
 
             <Separator className="my-5" />
@@ -509,9 +534,7 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
                 <Input value={occupation} onChange={(e) => setOccupation(e.target.value)} />
               </Field>
               <Field label="Weekly income (from documents)">
-                <div className="py-2 px-3 rounded border bg-muted text-sm">
-                  {applicant.weeklyIncome ? `$${applicant.weeklyIncome} / week` : 'Not detected — upload a payslip'}
-                </div>
+                <div className="py-2 px-3 rounded border bg-muted text-sm">{weeklyIncomeFromDocsLabel}</div>
               </Field>
             </div>
 

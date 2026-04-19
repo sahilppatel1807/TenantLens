@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { PropertyFormFields } from "@/components/PropertyFormFields";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,12 +40,13 @@ export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) =>
   const [parking, setParking] = useState("1");
   const [status, setStatus] = useState<Property["status"]>("active");
   const [imageUrl, setImageUrl] = useState("");
-  const [docs, setDocs] = useState<DocumentKey[]>(DEFAULT_DOCS);
+  const [docs, setDocs] = useState<DocumentKey[]>(["id", "proof_of_income", "bank_statements", "rental_history", "references"]);
+  const [coverUploading, setCoverUploading] = useState(false);
 
   const reset = () => {
     setAddress(""); setSuburb(""); setCity(""); setWeeklyRent("");
     setBedrooms("2"); setBathrooms("1"); setParking("1");
-    setStatus("active"); setImageUrl(""); setDocs(DEFAULT_DOCS);
+    setStatus("active"); setImageUrl(""); setDocs(["id", "proof_of_income", "bank_statements", "rental_history", "references"]);
   };
 
   const toggleDoc = (k: DocumentKey) =>
@@ -88,78 +90,35 @@ export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) =>
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Street address" className="sm:col-span-2">
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="12/48 Bondi Road" />
-            </Field>
-            <Field label="Suburb">
-              <Input value={suburb} onChange={(e) => setSuburb(e.target.value)} placeholder="Bondi" />
-            </Field>
-            <Field label="City / State">
-              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Sydney NSW 2026" />
-            </Field>
-            <Field label="Weekly rent ($)">
-              <Input type="number" min={0} value={weeklyRent} onChange={(e) => setWeeklyRent(e.target.value)} placeholder="850" />
-            </Field>
-            <Field label="Status">
-              <Select value={status} onValueChange={(v) => setStatus(v as Property["status"])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="leased">Leased</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Bedrooms">
-              <Input type="number" min={0} value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} />
-            </Field>
-            <Field label="Bathrooms">
-              <Input type="number" min={0} value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
-            </Field>
-            <Field label="Parking">
-              <Input type="number" min={0} value={parking} onChange={(e) => setParking(e.target.value)} />
-            </Field>
-          </div>
-
-          <Field label="Cover image URL (optional)">
-            <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
-          </Field>
-
-          <div>
-            <Label className="text-sm font-semibold">Required documents</Label>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Applicants will be scored on completeness against this list.
-            </p>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {DOCUMENT_KEYS.map((k) => (
-                <label
-                  key={k}
-                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-secondary/40"
-                >
-                  <Checkbox checked={docs.includes(k)} onCheckedChange={() => toggleDoc(k)} />
-                  <span>{DOCUMENT_LABELS[k]}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
+          <PropertyFormFields
+            address={address}
+            setAddress={setAddress}
+            suburb={suburb}
+            setSuburb={setSuburb}
+            city={city}
+            setCity={setCity}
+            weeklyRent={weeklyRent}
+            setWeeklyRent={setWeeklyRent}
+            bedrooms={bedrooms}
+            setBedrooms={setBedrooms}
+            bathrooms={bathrooms}
+            setBathrooms={setBathrooms}
+            parking={parking}
+            setParking={setParking}
+            status={status}
+            setStatus={setStatus}
+            imageUrl={imageUrl}
+            setImageUrl={setImageUrl}
+            docs={docs}
+            toggleDoc={toggleDoc}
+            onCoverUploadStateChange={setCoverUploading}
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit">Add property</Button>
+            <Button type="submit" disabled={coverUploading}>Add property</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 };
-
-const Field = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => (
-  <div className={`space-y-1.5 ${className}`}>
-    <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-    {children}
-  </div>
-);

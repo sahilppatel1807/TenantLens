@@ -88,6 +88,29 @@ describe("processApplicantPdfBuffer", () => {
     expect(result.errorMessage).toContain("Reference OCR failure");
   });
 
+  it("parses income when DB slot is proof_of_income even if filename does not hint payslip", async () => {
+    extractPdfTextMock.mockResolvedValueOnce(
+      "Pay period from 01/01/2024 to 07/01/2024\nGross Pay $1,500.00\n",
+    );
+    analyzePayslipTextIncomeMock.mockReturnValue({
+      weeklyIncome: 1500,
+      confidence: "high",
+    });
+
+    const result = await processApplicantPdfBuffer(Buffer.from("pdf"), {
+      filename: "1745000000-0-document.pdf",
+      documentKey: "proof_of_income",
+      slot: "proof_of_income",
+    });
+
+    expect(extractPdfTextMock).toHaveBeenCalledTimes(1);
+    expect(analyzePayslipTextIncomeMock).toHaveBeenCalledTimes(1);
+    expect(result.displayType).toBe("payslip");
+    expect(result.mappedDocumentKeys).toEqual(["proof_of_income"]);
+    expect(result.weeklyIncome).toBe(1500);
+    expect(result.needsReview).toBe(false);
+  });
+
   it("skips extraction for non-target docs and keeps completion-only fields", async () => {
     const result = await processApplicantPdfBuffer(Buffer.from("pdf"), {
       filename: "passport_front.pdf",

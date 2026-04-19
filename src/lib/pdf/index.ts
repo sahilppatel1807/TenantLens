@@ -9,6 +9,7 @@ export { parseReferenceLetterText } from "./parse-reference-letter";
 export {
   analyzePayslipPdfBuffer,
   analyzePayslipTextIncome,
+  inferPayFrequencyFromDocument,
   inferPayPeriodDays,
   normalizeIncomeToWeekly,
   parseMoneyAUD,

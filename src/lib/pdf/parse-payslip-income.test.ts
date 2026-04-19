@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  inferPayFrequencyFromDocument,
   inferPayPeriodDays,
   normalizeIncomeToWeekly,
   parseMoneyAUD,
@@ -46,6 +47,11 @@ describe("parseMoneyAUD", () => {
     expect(parseMoneyAUDExplicitDollar(line)).toEqual([995.7]);
     expect(parseMoneyAUD(line).length).toBeGreaterThan(3);
   });
+
+  it("parses explicit £ amounts", () => {
+    expect(parseMoneyAUDExplicitDollar("Gross Earnings £2,500.50")).toEqual([2500.5]);
+    expect(parseMoneyAUD("Net Payment €1,200.00")).toEqual([1200]);
+  });
 });
 
 describe("inferPayPeriodDays", () => {
@@ -62,6 +68,14 @@ describe("inferPayPeriodDays", () => {
   it("handles DD.MM.YYYY dates around Pay Period (AU-style export)", () => {
     const text = `09.03.2026\tPay Period \t15.03.2026\t-\nWeekly\tPay Frequency`;
     expect(inferPayPeriodDays(text)).toBe(7);
+  });
+});
+
+describe("inferPayFrequencyFromDocument", () => {
+  it("reads pay frequency from labelled payroll lines", () => {
+    expect(inferPayFrequencyFromDocument("Pay Frequency: Fortnightly\n")).toBe("fortnightly");
+    expect(inferPayFrequencyFromDocument("Payment Frequency - Monthly")).toBe("monthly");
+    expect(inferPayFrequencyFromDocument("Pay period type: Weekly")).toBe("weekly");
   });
 });
 
@@ -125,6 +139,25 @@ Total Gross $5,000.00`;
     expect(r.detectedIncomeAmount).toBe(800);
     expect(r.detectedPayFrequency).toBe("weekly");
     expect(r.amountSource).toBe("gross");
+  });
+
+  it("uses gross earnings with pay frequency on another line", () => {
+    const raw = `Gross Earnings £3,000.00
+Pay Frequency: Monthly`;
+    const r = parsePayslipIncomeFromText(raw);
+    expect(r.detectedIncomeAmount).toBe(3000);
+    expect(r.detectedPayFrequency).toBe("monthly");
+    expect(r.amountSource).toBe("gross");
+    expect(r.notes.some((n) => n.includes("document wording"))).toBe(true);
+  });
+
+  it("uses bi-weekly wording as fortnightly pay", () => {
+    const raw = `Total Gross $2,400.00
+Pay Frequency: Bi-weekly`;
+    const r = parsePayslipIncomeFromText(raw);
+    expect(r.detectedIncomeAmount).toBe(2400);
+    expect(r.detectedPayFrequency).toBe("fortnightly");
+    expect(normalizeIncomeToWeekly(r.detectedIncomeAmount!, r.detectedPayFrequency)).toBe(1200);
   });
 
   it("keeps candidates bounded", () => {

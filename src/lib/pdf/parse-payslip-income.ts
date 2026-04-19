@@ -12,7 +12,8 @@ const MAX_CANDIDATES = 5;
 
 type LabelKind = "annual" | "gross" | "net";
 
-const MONEY_RE = /\$?\s*([\d,]+(?:\.\d{1,2})?)/gi;
+/** Optional currency symbol; amounts may appear with $, £, €, or none (text layer). */
+const MONEY_RE = /(?:\$|£|€)?\s*([\d,]+(?:\.\d{1,2})?)/gi;
 
 /** Parse first / all money tokens in a string (commas stripped). */
 export function parseMoneyAUD(text: string): number[] {
@@ -26,12 +27,12 @@ export function parseMoneyAUD(text: string): number[] {
   return out;
 }
 
-const EXPLICIT_DOLLAR_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)/gi;
+const EXPLICIT_CURRENCY_RE = /(?:\$|£|€)\s*([\d,]+(?:\.\d{1,2})?)/gi;
 
-/** Money tokens that use a `$` prefix (avoids treating `20/11/2025` as `20`, `11`, …). */
+/** Money tokens with an explicit currency symbol (avoids treating `20/11/2025` as money). */
 export function parseMoneyAUDExplicitDollar(text: string): number[] {
   const out: number[] = [];
-  const re = new RegExp(EXPLICIT_DOLLAR_RE.source, "gi");
+  const re = new RegExp(EXPLICIT_CURRENCY_RE.source, "gi");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const n = Number.parseFloat(m[1].replace(/,/g, ""));
@@ -155,7 +156,12 @@ function frequencyFromLine(line: string): PayFrequency {
   ) {
     return "weekly";
   }
-  if (/\bfortnightly\b/.test(l) || /\bper\s+fortnight\b/.test(l)) {
+  if (
+    /\bfortnightly\b/.test(l) ||
+    /\bper\s+fortnight\b/.test(l) ||
+    /\bbi-?weekly\b/.test(l) ||
+    /\bbiweekly\b/.test(l)
+  ) {
     return "fortnightly";
   }
   if (/\bmonthly\b/.test(l) || /\bper\s+month\b/.test(l)) {
@@ -164,6 +170,55 @@ function frequencyFromLine(line: string): PayFrequency {
   if (/\bannual(ly)?\b/.test(l) || /\bper\s+year\b/.test(l)) {
     return "annual";
   }
+  return "unknown";
+}
+
+/**
+ * Many payroll PDFs put pay frequency on its own line; `frequencyFromLine` only sees the
+ * income label row, so gross can parse while frequency stays unknown → no weekly figure.
+ */
+export function inferPayFrequencyFromDocument(rawText: string): PayFrequency {
+  const text = rawText.replace(/\r\n/g, "\n");
+  const mapPhrase = (phrase: string): PayFrequency => {
+    const w = phrase.toLowerCase().replace(/\s+/g, " ").trim();
+    const head = (w.split(/[,(]/)[0] ?? w).trim();
+    if (!head) return "unknown";
+    if (/^weekly\b|^w\/?e\b|^each\s+week/.test(head)) return "weekly";
+    if (
+      /^fortnight/.test(head) ||
+      /^fortnightly/.test(head) ||
+      /^bi-?weekly/.test(head) ||
+      /^biweekly/.test(head) ||
+      /^every\s+2\s+weeks?/.test(head)
+    ) {
+      return "fortnightly";
+    }
+    if (/^monthly|^every\s+month|^per\s+month/.test(head)) return "monthly";
+    if (/^annual|^yearly|^per\s+year/.test(head)) return "annual";
+    return "unknown";
+  };
+
+  const linePatterns = [
+    /pay\s+frequency\s*[:\t .-]+\s*([^\n\r,;]{1,48})/gi,
+    /payment\s+frequency\s*[:\t .-]+\s*([^\n\r,;]{1,48})/gi,
+    /pay\s+period\s+type\s*[:\t .-]+\s*([^\n\r,;]{1,48})/gi,
+    /frequency\s+of\s+pay\s*[:\t .-]+\s*([^\n\r,;]{1,48})/gi,
+    /pay\s+cycle\s*[:\t .-]+\s*([^\n\r,;]{1,48})/gi,
+  ];
+  for (const re of linePatterns) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const f = mapPhrase(m[1] ?? "");
+      if (f !== "unknown") return f;
+    }
+  }
+
+  if (/paid\s+every\s+week\b/i.test(text) || /\bweekly\s+pay\b/i.test(text)) {
+    return "weekly";
+  }
+  if (/\bfortnightly\s+pay\b/i.test(text)) return "fortnightly";
+  if (/\bmonthly\s+pay\b/i.test(text)) return "monthly";
   return "unknown";
 }
 
@@ -186,16 +241,27 @@ function labelOnLine(line: string): LabelKind | null {
   }
   if (
     /\bgross\s+pay\b/.test(l) ||
+    /\bgross\s+earnings?\b/.test(l) ||
+    /\bgross\s+wages?\b/.test(l) ||
+    /\bgross\s+payment\b/.test(l) ||
     /\btotal\s+gross\b/.test(l) ||
-    /\bordinary\b[^\n]{0,24}\bgross\b/.test(l)
+    /\btotal\s+earnings?\b/.test(l) ||
+    /\bearnings\s+before\s+tax\b/.test(l) ||
+    /\bordinary\s+time\s+earnings?\b/.test(l) ||
+    /\bordinary\b[^\n]{0,24}\bgross\b/.test(l) ||
+    /\btaxable\s+gross\b/.test(l)
   ) {
     return "gross";
   }
   if (
     /\bnet\s+pay\b/.test(l) ||
+    /\bnet\s+earnings?\b/.test(l) ||
+    /\bnet\s+payment\b/.test(l) ||
     /\btotal\s+net\s+pay\b/.test(l) ||
+    /\btotal\s+net\b/.test(l) ||
     /\btake\s+home\b/.test(l) ||
-    /\bamount\s+payable\b/.test(l)
+    /\bamount\s+payable\b/.test(l) ||
+    /\bpay\s+this\s+period\b/.test(l)
   ) {
     return "net";
   }
@@ -261,6 +327,7 @@ function pickGrossForTier1(
     let score = r.amount;
     if (/\btotal\s+gross\b/.test(l)) score += 1_000_000;
     else if (/\bgross\s+pay\b/.test(l)) score += 500_000;
+    else if (/\bgross\s+earnings?\b/.test(l)) score += 400_000;
     return { ...r, score };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -390,6 +457,18 @@ export function parsePayslipIncomeFromText(rawText: string): PayslipIncomeParse 
     amountSource === "gross"
   ) {
     notes.push("Multiple gross lines; picked highest-priority / strongest label match.");
+  }
+
+  if (
+    detectedIncomeAmount != null &&
+    detectedPayFrequency === "unknown" &&
+    amountSource !== "annual"
+  ) {
+    const fromDoc = inferPayFrequencyFromDocument(rawText);
+    if (fromDoc !== "unknown") {
+      detectedPayFrequency = fromDoc;
+      notes.push(`Inferred pay frequency ${fromDoc} from document wording.`);
+    }
   }
 
   return {

@@ -28,6 +28,17 @@ function resolveRentalReferenceIntent(
   return null;
 }
 
+/** Re-analyze and client intent tag a row as proof of income even if the filename does not. */
+function isProofOfIncomeDocumentSlot(
+  options: ProcessApplicantPdfBufferOptions | undefined,
+  rentalIntent: ReturnType<typeof resolveRentalReferenceIntent>,
+): boolean {
+  if (rentalIntent != null) return false;
+  const key = options?.documentKey;
+  const slot = (options?.slot ?? "").toString().trim().toLowerCase();
+  return key === "proof_of_income" || slot === "proof_of_income";
+}
+
 function mapPhotoIdKeys(rawText: string, filename?: string | null): DocumentKey[] {
   const combined = `${filename ?? ""} ${rawText}`.toLowerCase();
   if (/\bpassport\b/.test(combined)) return ["passport"];
@@ -88,6 +99,7 @@ export async function processApplicantPdfBuffer(
 ): Promise<ApplicantPdfPipelineCoreResult> {
   const rentalIntent = resolveRentalReferenceIntent(options);
   const displayTypeFromFilename = classifyDocumentFromFilename(options?.filename);
+  const proofIncomeSlot = isProofOfIncomeDocumentSlot(options, rentalIntent);
   let displayType: ApplicantDocumentDisplayType =
     rentalIntent != null
       ? rentalIntent === "rental_history"
@@ -95,7 +107,7 @@ export async function processApplicantPdfBuffer(
         : "references"
       : displayTypeFromFilename;
   let mappedDocumentKeys = mapDisplayTypeToDocumentKeys(displayType, "", options?.filename);
-  const isPayslipTarget = displayType === "payslip";
+  const isPayslipTarget = displayType === "payslip" || proofIncomeSlot;
   const isReferenceTarget = displayType === "references" || displayType === "rental_history";
   const needsTextFallback = displayType === "unknown" && rentalIntent == null;
   const isTargetExtraction = isPayslipTarget || isReferenceTarget || needsTextFallback;
@@ -119,6 +131,11 @@ export async function processApplicantPdfBuffer(
     if (needsTextFallback) {
       displayType = classifyDocumentFromText(rawText);
       mappedDocumentKeys = mapDisplayTypeToDocumentKeys(displayType, rawText, options?.filename);
+    }
+
+    if (proofIncomeSlot) {
+      displayType = "payslip";
+      mappedDocumentKeys = ["proof_of_income"];
     }
 
     const { weeklyIncome, confidence } = displayType === "payslip"

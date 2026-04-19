@@ -1,5 +1,4 @@
 import { useId, useState } from "react";
-import { PdfIntakeFilePicker } from "./pdf-intake-file-picker";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { uploadIntakePdfsBestEffort } from "@/lib/applicant-intake-storage";
 import { analyzeApplicantPdfFiles, inferAnalyzeIntentFromFilename } from "@/lib/pdf/analyze-applicant-pdfs-client";
+import { mergeReferenceLetterFieldsFromAnalyzeResults, recommendationSentimentToReferenceQuality } from "@/lib/rental-history-from-pdf";
+import { normalizeDocumentKeys } from "@/lib/db/mappers";
 import type { ApplicantPdfAnalyzeResultItem } from "@/lib/pdf/applicant-pdf-analyze-result";
 import { useData } from "@/lib/store";
 import type { Property } from "@/lib/types";
@@ -69,24 +70,53 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
     setSubmitStage(hasSelectedPdfs ? "analyzing" : "saving");
     try {
       let analyzedWeeklyIncome: number | null = null;
-      let analyzedResults: ApplicantPdfAnalyzeResultItem[] | null = null;
-      let localHasUnknownOrFailedReference = false;
+let analyzedResults: ApplicantPdfAnalyzeResultItem[] | null = null;
+let localHasUnknownOrFailedReference = false;
+let mergedRentalHistory: import("@/lib/types").RentalHistory = {
+  yearsRenting: 0,
+  onTimePaymentsPct: 0,
+  referenceQuality: "none",
+  monthsRenting: null,
+  recommendationSentiment: null,
+};
+let submittedDocuments: import("@/lib/types").DocumentKey[] = [];
+
 
       if (hasSelectedPdfs) {
         analyzedResults = await analyzeApplicantPdfFiles(
           selectedPdfFiles,
           selectedPdfFiles.map((file) => inferAnalyzeIntentFromFilename(file.name)),
         );
-        const positiveIncome = analyzedResults
-          .map((item) => item.weeklyIncome ?? 0)
-          .find((value) => value > 0);
-        analyzedWeeklyIncome = positiveIncome ?? null;
+        // Use the max income from all successful payslip results
+const positiveIncomes = analyzedResults
+  .filter((item) => item.weeklyIncome && item.weeklyIncome > 0)
+  .map((item) => item.weeklyIncome!);
+analyzedWeeklyIncome = positiveIncomes.length > 0 ? Math.max(...positiveIncomes) : null;
         localHasUnknownOrFailedReference = analyzedResults.some(
           (row) =>
             (row.displayType === "rental_history" || row.displayType === "references") &&
             (row.extractionStatus === "failed" || row.needsReview),
         );
-        setHasUnknownOrFailedReference(localHasUnknownOrFailedReference);
+        // Merge rental/reference fields from all successful results
+const mergedFields = mergeReferenceLetterFieldsFromAnalyzeResults(analyzedResults);
+mergedRentalHistory = {
+  yearsRenting: 0,
+  onTimePaymentsPct: 0,
+  referenceQuality: mergedFields.recommendationSentiment
+    ? recommendationSentimentToReferenceQuality(mergedFields.recommendationSentiment)
+    : "none",
+  monthsRenting: mergedFields.monthsRenting ?? null,
+  recommendationSentiment: mergedFields.recommendationSentiment ?? null,
+  ...(historyNotes.trim() ? { notes: historyNotes.trim() } : {}),
+};
+
+// Build submittedDocuments from successful analysis, intersected with required documents
+const allDocKeys = analyzedResults
+  .filter((item) => item.extractionStatus === "success" && Array.isArray(item.mappedDocumentKeys))
+  .flatMap((item) => item.mappedDocumentKeys);
+submittedDocuments = normalizeDocumentKeys(allDocKeys) as import("@/lib/types").DocumentKey[];
+
+setHasUnknownOrFailedReference(localHasUnknownOrFailedReference);
       } else {
         setHasUnknownOrFailedReference(false);
       }
@@ -101,15 +131,8 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
         phone: phone.trim(),
         occupation: occupation.trim(),
         weeklyIncome: resolvedWeeklyIncome,
-        submittedDocuments: [],
-        rentalHistory: {
-          yearsRenting: 0,
-          onTimePaymentsPct: 0,
-          referenceQuality: "none",
-          notes: historyNotes.trim() || undefined,
-          monthsRenting: null,
-          recommendationSentiment: null,
-        },
+        submittedDocuments,
+        rentalHistory: mergedRentalHistory,
         notes: agentNotes.trim() || undefined,
       });
 
@@ -134,10 +157,13 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
 
         await refreshData();
 
-        if (uploadResult.failures.length > 0) {
+        if (uploadResult.failures.length > 0 || localHasUnknownOrFailedReference) {
           toast({
             title: "Applicant added with PDF warnings",
-            description: uploadResult.failures.map((f) => `${f.filename}: ${f.message}`).join(" | "),
+            description: [
+              ...uploadResult.failures.map((f) => `${f.filename}: ${f.message}`),
+              localHasUnknownOrFailedReference ? "Some references or rental history could not be fully analyzed." : undefined
+            ].filter(Boolean).join(" | "),
             variant: "destructive",
           });
         }

@@ -79,33 +79,37 @@ export async function POST(request: Request) {
 
     let nextWeeklyIncome = Math.max(0, Number(applicant.weekly_income) || 0);
 
-    for (const doc of (docs ?? []) as StoredDocRow[]) {
-      const { data: fileBlob, error: downloadError } = await supabase.storage
-        .from("applicant-documents")
-        .download(doc.storage_path);
-      if (downloadError || !fileBlob) continue;
+    let downloadFailures = 0;
+for (const doc of (docs ?? []) as StoredDocRow[]) {
+  const { data: fileBlob, error: downloadError } = await supabase.storage
+    .from("applicant-documents")
+    .download(doc.storage_path);
+  if (downloadError || !fileBlob) {
+    downloadFailures++;
+    continue;
+  }
 
-      const buffer = Buffer.from(await fileBlob.arrayBuffer());
-      const documentKey = toDocumentKey(doc.document_key);
-      const analyzed = await processApplicantPdfBuffer(buffer, {
-        filename: doc.original_filename,
-        documentKey,
-        slot: doc.document_key,
-      });
+  const buffer = Buffer.from(await fileBlob.arrayBuffer());
+  const documentKey = toDocumentKey(doc.document_key);
+  const analyzed = await processApplicantPdfBuffer(buffer, {
+    filename: doc.original_filename,
+    documentKey,
+    slot: doc.document_key,
+  });
 
-      mappedFromAnalyze.push(...analyzed.mappedDocumentKeys);
-      if (analyzed.extractionStatus === "success" && analyzed.weeklyIncome != null && analyzed.weeklyIncome > 0) {
-        nextWeeklyIncome = Math.max(nextWeeklyIncome, Math.round(analyzed.weeklyIncome));
-      }
-      analyzeResults.push({
-        displayType: analyzed.displayType,
-        extractionStatus: analyzed.extractionStatus,
-        monthsRenting: analyzed.monthsRenting,
-        recommendationSentiment: analyzed.recommendationSentiment,
-        weeklyIncome: analyzed.weeklyIncome,
-        needsReview: analyzed.needsReview,
-      });
-    }
+  mappedFromAnalyze.push(...analyzed.mappedDocumentKeys);
+  if (analyzed.extractionStatus === "success" && analyzed.weeklyIncome != null && analyzed.weeklyIncome > 0) {
+    nextWeeklyIncome = Math.max(nextWeeklyIncome, Math.round(analyzed.weeklyIncome));
+  }
+  analyzeResults.push({
+    displayType: analyzed.displayType,
+    extractionStatus: analyzed.extractionStatus,
+    monthsRenting: analyzed.monthsRenting,
+    recommendationSentiment: analyzed.recommendationSentiment,
+    weeklyIncome: analyzed.weeklyIncome,
+    needsReview: analyzed.needsReview,
+  });
+}
 
     const nextManualReview = {
       incomeExtractionFailed:
@@ -190,7 +194,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return Response.json({ updated });
+    return Response.json({ updated, downloadFailures });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected re-analysis error";
     return Response.json({ error: message }, { status: 500 });

@@ -176,6 +176,10 @@ export function applicantToInsert(
   };
 }
 
+export type ApplicantUpdatePatch = Partial<
+  Omit<Applicant, "id" | "propertyId" | "appliedAt" | "status">
+>;
+
 /** Columns for `applicants.update` (excluding immutable identifiers/status). */
 export function applicantToUpdateRow(a: Omit<Applicant, "id" | "propertyId" | "appliedAt" | "status">) {
   return {
@@ -189,6 +193,23 @@ export function applicantToUpdateRow(a: Omit<Applicant, "id" | "propertyId" | "a
     notes: a.notes ?? null,
     ...(a.manualReview ? { manual_review: a.manualReview } : {}),
   };
+}
+
+/** Partial update: only keys present in `patch` are sent to Supabase (avoids clobbering PDF-derived fields). */
+export function applicantToUpdateRowPartial(patch: ApplicantUpdatePatch): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (patch.name !== undefined) out.name = patch.name;
+  if (patch.email !== undefined) out.email = patch.email;
+  if (patch.phone !== undefined) out.phone = patch.phone;
+  if (patch.occupation !== undefined) out.occupation = patch.occupation;
+  if (patch.weeklyIncome !== undefined) out.weekly_income = toDbInteger(patch.weeklyIncome);
+  if (patch.submittedDocuments !== undefined) {
+    out.submitted_documents = normalizeDocumentKeys(patch.submittedDocuments);
+  }
+  if (patch.rentalHistory !== undefined) out.rental_history = patch.rentalHistory;
+  if (patch.notes !== undefined) out.notes = patch.notes ?? null;
+  if (patch.manualReview !== undefined) out.manual_review = patch.manualReview;
+  return out;
 }
 
 export function normalizeDocumentKeys(docs: string[]): DocumentKey[] {

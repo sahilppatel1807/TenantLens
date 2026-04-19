@@ -13,13 +13,14 @@ import type { Applicant, ApplicantStatus, Property } from "./types";
 import { getSupabaseBrowserClient } from "./supabase/browser";
 import {
   applicantToInsert,
-  applicantToUpdateRow,
+  applicantToUpdateRowPartial,
   normalizeDocumentKeys,
   propertyToInsert,
   propertyToUpdateRow,
   rowToApplicant,
   rowToProperty,
 } from "./db/mappers";
+import type { ApplicantUpdatePatch } from "./db/mappers";
 
 function toError(err: unknown): Error {
   if (err instanceof Error) return err;
@@ -40,10 +41,7 @@ interface DataStore {
   addProperty: (p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
   updateProperty: (id: string, p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
   addApplicant: (a: Omit<Applicant, "id" | "appliedAt" | "status">) => Promise<Applicant>;
-  updateApplicant: (
-    id: string,
-    a: Omit<Applicant, "id" | "propertyId" | "appliedAt" | "status">,
-  ) => Promise<Applicant>;
+  updateApplicant: (id: string, a: ApplicantUpdatePatch) => Promise<Applicant>;
   setApplicantStatus: (id: string, status: ApplicantStatus) => Promise<void>;
   deleteApplicant: (id: string) => Promise<void>;
 }
@@ -216,10 +214,15 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("No accessible properties found for this account.");
       }
 
-      const patch = applicantToUpdateRow({
+      const patch = applicantToUpdateRowPartial({
         ...a,
-        submittedDocuments: normalizeDocumentKeys(a.submittedDocuments),
+        ...(a.submittedDocuments !== undefined
+          ? { submittedDocuments: normalizeDocumentKeys(a.submittedDocuments) }
+          : {}),
       });
+      if (Object.keys(patch).length === 0) {
+        throw new Error("No applicant fields to update.");
+      }
       const { data, error } = await supabase
         .from("applicants")
         .update(patch)
