@@ -33,7 +33,7 @@ export function RegisterPage() {
         toast({
           title: "Configuration error",
           description:
-            "Add NEXT_PUBLIC_SUPABASE_URL and either NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to .env.local.",
+            "Set NEXT_PUBLIC_SUPABASE_URL and either NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in Vercel (Production), then redeploy — NEXT_PUBLIC_* is embedded at build time. Locally, use .env.local.",
           variant: "destructive",
         });
         return;
