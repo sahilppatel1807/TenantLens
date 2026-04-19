@@ -405,8 +405,8 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
           <div className="flex items-center gap-4">
             <ScoreRing score={score.total} tier={score.tier} size={64} strokeWidth={6} />
             <div className="min-w-0 flex-1">
-              <span className="truncate text-xl">{applicant.name}</span>
-              <span className="truncate">
+              <span className="block truncate text-xl font-semibold">{applicant.name}</span>
+              <span className="mt-1 block truncate text-sm text-muted-foreground">
                 {applicant.occupation} · Applied {new Date(applicant.appliedAt).toLocaleDateString()}
               </span>
               <div className="mt-2">
