@@ -1,6 +1,7 @@
 export type Tier = "good" | "average" | "bad";
 
 export type ApplicantStatus = "new" | "shortlisted" | "rejected";
+export type RecommendationSentiment = "strong" | "neutral" | "negative";
 
 export type DocumentKey =
   | "id"
@@ -34,6 +35,20 @@ export const DOCUMENT_KEYS: DocumentKey[] = [
   "references",
 ];
 
+export interface RentalHistory {
+  yearsRenting: number;
+  onTimePaymentsPct: number; // 0-100
+  referenceQuality: "strong" | "ok" | "weak" | "none";
+  notes?: string;
+  monthsRenting: number | null;
+  recommendationSentiment: RecommendationSentiment | null;
+}
+
+export interface ApplicantManualReview {
+  incomeExtractionFailed: boolean;
+  referenceExtractionFailed: boolean;
+}
+
 export interface Property {
   id: string;
   address: string;
@@ -58,13 +73,9 @@ export interface Applicant {
   occupation: string;
   weeklyIncome: number;
   submittedDocuments: DocumentKey[];
-  rentalHistory: {
-    yearsRenting: number;
-    onTimePaymentsPct: number; // 0-100
-    referenceQuality: "strong" | "ok" | "weak" | "none";
-    notes?: string;
-  };
+  rentalHistory: RentalHistory;
   appliedAt: string;
   notes?: string;
   status: ApplicantStatus;
+  manualReview?: ApplicantManualReview;
 }

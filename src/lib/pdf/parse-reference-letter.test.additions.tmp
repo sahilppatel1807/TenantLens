@@ -1,0 +1,24 @@
+// Additional real-world reference formats
+it("extracts months from 'since' month-year phrasing", () => {
+  const text = `Tenant has resided here since March 2023. Reference written May 2024.`;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14); // March 2023 to May 2024
+});
+
+it("extracts months from 'for 1 year 3 months' phrasing", () => {
+  const text = `The tenant stayed for 1 year 3 months and paid rent on time.`;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(15);
+});
+
+it("extracts months from 'tenancy period: Mar 2023–May 2024'", () => {
+  const text = `Tenancy period: Mar 2023–May 2024. No issues.`;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+});
+
+it("extracts months from 'from 2022-03 to 2023-05' phrasing", () => {
+  const text = `Rental from 2022-03 to 2023-05. Good tenant.`;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+});

@@ -1,55 +1,296 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { mockApplicants, mockProperties } from "./mock-data";
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Applicant, ApplicantStatus, Property } from "./types";
+import { getSupabaseBrowserClient } from "./supabase/browser";
+import {
+  applicantToInsert,
+  applicantToUpdateRow,
+  normalizeDocumentKeys,
+  propertyToInsert,
+  propertyToUpdateRow,
+  rowToApplicant,
+  rowToProperty,
+} from "./db/mappers";
+
+function toError(err: unknown): Error {
+  if (err instanceof Error) return err;
+  if (typeof err === "string" && err.trim()) return new Error(err);
+  if (err && typeof err === "object") {
+    const maybeMessage = (err as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return new Error(maybeMessage);
+  }
+  return new Error("Unknown database error");
+}
 
 interface DataStore {
   properties: Property[];
   applicants: Applicant[];
-  addProperty: (p: Omit<Property, "id" | "createdAt">) => Property;
-  addApplicant: (a: Omit<Applicant, "id" | "appliedAt" | "status">) => Applicant;
-  setApplicantStatus: (id: string, status: ApplicantStatus) => void;
+  loading: boolean;
+  userId: string | null;
+  refreshData: () => Promise<Applicant[]>;
+  addProperty: (p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
+  updateProperty: (id: string, p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
+  addApplicant: (a: Omit<Applicant, "id" | "appliedAt" | "status">) => Promise<Applicant>;
+  updateApplicant: (
+    id: string,
+    a: Omit<Applicant, "id" | "propertyId" | "appliedAt" | "status">,
+  ) => Promise<Applicant>;
+  setApplicantStatus: (id: string, status: ApplicantStatus) => Promise<void>;
+  deleteApplicant: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<DataStore | null>(null);
 
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80";
-
 export const DataProvider = ({ children }: { children: ReactNode }) => {
-  const [properties, setProperties] = useState<Property[]>(mockProperties);
-  const [applicants, setApplicants] = useState<Applicant[]>(
-    mockApplicants.map((a) => ({ status: "new" as ApplicantStatus, ...a })),
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+
+  const refreshData = useCallback(async (): Promise<Applicant[]> => {
+    setLoading(true);
+    try {
+      if (!supabase) {
+        setUserId(null);
+        setProperties([]);
+        setApplicants([]);
+        return;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setUserId(null);
+        setProperties([]);
+        setApplicants([]);
+        return;
+      }
+      setUserId(user.id);
+
+      const { data: propRows, error: propErr } = await supabase
+        .from("properties")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (propErr) {
+        console.error(propErr);
+        setProperties([]);
+        setApplicants([]);
+        return [];
+      }
+
+      const rows = propRows ?? [];
+      setProperties(rows.map((r) => rowToProperty(r)));
+
+      const ids = rows.map((r: { id: string }) => r.id);
+      if (ids.length === 0) {
+        setApplicants([]);
+        return;
+      }
+
+      const { data: appRows, error: appErr } = await supabase
+        .from("applicants")
+        .select("*")
+        .in("property_id", ids);
+
+      if (appErr) {
+        console.error(appErr);
+        setApplicants([]);
+        return [];
+      }
+
+      const mapped = (appRows ?? []).map((r) => rowToApplicant(r));
+      setApplicants(mapped);
+      return mapped;
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    void refreshData();
+  }, [refreshData]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      void refreshData();
+    });
+    return () => subscription.unsubscribe();
+  }, [supabase, refreshData]);
+
+  const addProperty = useCallback<DataStore["addProperty"]>(
+    async (p) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      const insert = propertyToInsert(p, user.id);
+      const { data, error } = await supabase.from("properties").insert(insert).select("*").single();
+      if (error) throw toError(error);
+      await refreshData();
+      return rowToProperty(data);
+    },
+    [supabase, refreshData],
   );
 
-  const addProperty = useCallback<DataStore["addProperty"]>((p) => {
-    const property: Property = {
-      ...p,
-      imageUrl: p.imageUrl || FALLBACK_IMAGE,
-      id: `p_${Date.now().toString(36)}`,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    setProperties((prev) => [property, ...prev]);
-    return property;
-  }, []);
+  const updateProperty = useCallback<DataStore["updateProperty"]>(
+    async (id, p) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
 
-  const addApplicant = useCallback<DataStore["addApplicant"]>((a) => {
-    const applicant: Applicant = {
-      ...a,
-      id: `a_${Date.now().toString(36)}`,
-      appliedAt: new Date().toISOString().slice(0, 10),
-      status: "new",
-    };
-    setApplicants((prev) => [applicant, ...prev]);
-    return applicant;
-  }, []);
+      const patch = propertyToUpdateRow(p);
+      const { data, error } = await supabase
+        .from("properties")
+        .update(patch)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select("*")
+        .single();
+      if (error) throw toError(error);
+      await refreshData();
+      return rowToProperty(data);
+    },
+    [supabase, refreshData],
+  );
 
-  const setApplicantStatus = useCallback<DataStore["setApplicantStatus"]>((id, status) => {
-    setApplicants((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-  }, []);
+  const addApplicant = useCallback<DataStore["addApplicant"]>(
+    async (a) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const insert = applicantToInsert({
+        ...a,
+        submittedDocuments: normalizeDocumentKeys(a.submittedDocuments),
+      });
+      const { data, error } = await supabase.from("applicants").insert(insert).select("*").single();
+      if (error) throw toError(error);
+      await refreshData();
+      return rowToApplicant(data);
+    },
+    [supabase, refreshData],
+  );
+
+  const setApplicantStatus = useCallback<DataStore["setApplicantStatus"]>(
+    async (id, status) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const { error } = await supabase.from("applicants").update({ status }).eq("id", id);
+      if (error) throw toError(error);
+      await refreshData();
+    },
+    [supabase, refreshData],
+  );
+
+  const updateApplicant = useCallback<DataStore["updateApplicant"]>(
+    async (id, a) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      const { data: ownedProperties, error: ownedErr } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("user_id", user.id);
+      if (ownedErr) throw toError(ownedErr);
+      const propertyIds = (ownedProperties ?? []).map((p: { id: string }) => p.id);
+      if (propertyIds.length === 0) {
+        throw new Error("No accessible properties found for this account.");
+      }
+
+      const patch = applicantToUpdateRow({
+        ...a,
+        submittedDocuments: normalizeDocumentKeys(a.submittedDocuments),
+      });
+      const { data, error } = await supabase
+        .from("applicants")
+        .update(patch)
+        .eq("id", id)
+        .in("property_id", propertyIds)
+        .select("*")
+        .single();
+      if (error) throw toError(error);
+      await refreshData();
+      return rowToApplicant(data);
+    },
+    [supabase, refreshData],
+  );
+
+  const deleteApplicant = useCallback<DataStore["deleteApplicant"]>(
+    async (id) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      const { data: ownedProperties, error: ownedErr } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("user_id", user.id);
+      if (ownedErr) throw toError(ownedErr);
+
+      const propertyIds = (ownedProperties ?? []).map((p: { id: string }) => p.id);
+      if (propertyIds.length === 0) {
+        throw new Error("No accessible properties found for this account.");
+      }
+
+      const { error } = await supabase
+        .from("applicants")
+        .delete()
+        .eq("id", id)
+        .in("property_id", propertyIds);
+      if (error) throw toError(error);
+      await refreshData();
+    },
+    [supabase, refreshData],
+  );
 
   const value = useMemo(
-    () => ({ properties, applicants, addProperty, addApplicant, setApplicantStatus }),
-    [properties, applicants, addProperty, addApplicant, setApplicantStatus],
+    () => ({
+      properties,
+      applicants,
+      loading,
+      userId,
+      refreshData,
+      addProperty,
+      updateProperty,
+      addApplicant,
+      updateApplicant,
+      setApplicantStatus,
+      deleteApplicant,
+    }),
+    [
+      properties,
+      applicants,
+      loading,
+      userId,
+      refreshData,
+      addProperty,
+      updateProperty,
+      addApplicant,
+      updateApplicant,
+      setApplicantStatus,
+      deleteApplicant,
+    ],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

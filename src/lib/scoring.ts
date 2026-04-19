@@ -1,4 +1,4 @@
-import type { Applicant, DocumentKey, Property, Tier } from "./types";
+import type { Applicant, DocumentKey, Property, RecommendationSentiment, RentalHistory, Tier } from "./types";
 
 export interface ScoreBreakdown {
   completeness: number; // /50
@@ -16,27 +16,84 @@ export function tierFor(score: number): Tier {
   return "bad";
 }
 
+/** Whole months used for rental-history tenure scoring and UI. Prefer PDF-derived months when set. */
+export function effectiveTenancyMonths(h: RentalHistory): number {
+  if (typeof h.monthsRenting === "number" && Number.isFinite(h.monthsRenting) && h.monthsRenting >= 0) {
+    return Math.round(h.monthsRenting);
+  }
+  return Math.max(0, Math.round(h.yearsRenting * 12));
+}
+
+/**
+ * Tenure sub-score for rental history (/10).
+ * - Under 5 months: 3
+ * - 5–12 months: months − 1, capped at 9 (so 12 months → 9)
+ * - Over 12 months: 10
+ */
+export function scoreTenancyMonthsForHistory(months: number): number {
+  const m = Math.max(0, Math.round(months));
+  if (m < 5) return 3;
+  if (m > 12) return 10;
+  return Math.min(m - 1, 9);
+}
+
+function scoreRecommendationSentiment(s: RecommendationSentiment): number {
+  switch (s) {
+    case "strong":
+      return 10;
+    case "neutral":
+      return 5;
+    case "negative":
+      return 0;
+    default: {
+      const _exhaustive: never = s;
+      return _exhaustive;
+    }
+  }
+}
+
+/** Recommendation sub-score for rental history (/10). Uses sentiment when present, else legacy reference quality. */
+export function scoreRecommendationForHistory(h: RentalHistory): number {
+  // Binary: any positive/acceptable reference = 20, else 0
+  if (
+    h.recommendationSentiment === "strong" ||
+    h.recommendationSentiment === "neutral" ||
+    h.referenceQuality === "strong" ||
+    h.referenceQuality === "ok"
+  ) {
+    return 20;
+  }
+  return 0;
+}
+
+/** Binary summary of reference / recommendation quality for display. */
+export function rentalBehaviorLabel(h: RentalHistory): "Good" | "None" {
+  return scoreRecommendationForHistory(h) === 20 ? "Good" : "None";
+}
+
 export function scoreApplicant(applicant: Applicant, property: Property): ScoreBreakdown {
   const required = property.requiredDocuments;
   const missing = required.filter((d) => !applicant.submittedDocuments.includes(d));
   const completeness =
     required.length === 0 ? 50 : Math.round(((required.length - missing.length) / required.length) * 50);
 
-  const ratio = property.weeklyRent === 0 ? 0 : applicant.weeklyIncome / property.weeklyRent;
+  const ratio = property.weeklyRent > 0 && applicant.weeklyIncome > 0
+    ? applicant.weeklyIncome / property.weeklyRent
+    : 0;
   let income = 0;
-  if (ratio >= 3) income = 30;
+  if (applicant.weeklyIncome <= 0 || property.weeklyRent <= 0) income = 0;
+  else if (ratio >= 3) income = 30;
   else if (ratio >= 2.5) income = 25;
   else if (ratio >= 2) income = 18;
   else if (ratio >= 1.5) income = 10;
+  else if (ratio >= 1.49) income = 9;
+  else if (ratio >= 1.4) income = 8;
+  else if (ratio >= 1.3) income = 7;
+  else if (ratio >= 1.25) income = 5;
   else income = 4;
 
-  const { yearsRenting, onTimePaymentsPct, referenceQuality } = applicant.rentalHistory;
-  let history = 0;
-  history += Math.min(8, yearsRenting * 2); // up to 8
-  history += Math.round((onTimePaymentsPct / 100) * 8); // up to 8
-  history +=
-    referenceQuality === "strong" ? 4 : referenceQuality === "ok" ? 2 : referenceQuality === "weak" ? 1 : 0;
-  history = Math.min(20, history);
+  // Binary: if any valid reference, 20; else 0
+  const history = scoreRecommendationForHistory(applicant.rentalHistory);
 
   const total = completeness + income + history;
   return {
