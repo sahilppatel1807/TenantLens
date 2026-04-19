@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScoreRing } from "./ScoreRing";
 import { TierBadge } from "./TierBadge";
 import { effectiveTenancyMonths, rentalBehaviorLabel, scoreApplicant } from "@/lib/scoring";
-import { DOCUMENT_LABELS, type Applicant, type Property } from "@/lib/types";
+import { documentKeyCategory, requiredCategoryIds, DOCUMENT_CATEGORY_LABELS } from "@/lib/document-categories";
+import type { Applicant, Property } from "@/lib/types";
 
 interface CompareDialogProps {
   open: boolean;
@@ -101,10 +102,10 @@ export const CompareDialog = ({ open, onOpenChange, applicants, property }: Comp
             </Row>
 
             {/* Documents matrix */}
-            {property.requiredDocuments.map((doc) => (
-              <Row key={doc} label={DOCUMENT_LABELS[doc]}>
+            {requiredCategoryIds(property.requiredDocuments).map((cat) => (
+              <Row key={cat} label={DOCUMENT_CATEGORY_LABELS[cat]}>
                 {scored.map(({ a }) =>
-                  a.submittedDocuments.includes(doc) ? (
+                  a.submittedDocuments.some((k) => documentKeyCategory(k) === cat) ? (
                     <Check key={a.id} className="h-4 w-4 text-tier-good" />
                   ) : (
                     <X key={a.id} className="h-4 w-4 text-tier-bad" />

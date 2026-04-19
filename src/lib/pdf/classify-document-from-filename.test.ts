@@ -41,4 +41,30 @@ describe("classifyDocumentFromFilename", () => {
       "employment_letter",
     );
   });
+
+  it("maps ApplicantName_reference with matching applicantName to references", () => {
+    expect(classifyDocumentFromFilename("Sahil_reference.pdf", "Sahil Khan")).toBe("references");
+  });
+
+  it("maps ApplicantName_bank_statement with matching applicantName to bank_statement", () => {
+    expect(classifyDocumentFromFilename("sahil_bank_statement_jan.pdf", "Sahil")).toBe(
+      "bank_statement",
+    );
+  });
+
+  it("does not strip a mismatched name prefix when applicantName is provided", () => {
+    expect(classifyDocumentFromFilename("jane_misc_application.pdf", "Sahil")).toBe("unknown");
+  });
+
+  it("does not strip leading token without applicantName when remainder would stay unknown", () => {
+    expect(classifyDocumentFromFilename("foo_bar.pdf")).toBe("unknown");
+  });
+
+  it("matches compact full name in the first underscore segment", () => {
+    expect(classifyDocumentFromFilename("SahilKhan_passport.pdf", "Sahil Khan")).toBe("photo_id");
+  });
+
+  it("classifies dl in remainder after name strip as photo_id", () => {
+    expect(classifyDocumentFromFilename("Sahil_dl.pdf", "Sahil")).toBe("photo_id");
+  });
 });

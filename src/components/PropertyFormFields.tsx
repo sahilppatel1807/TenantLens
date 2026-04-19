@@ -16,7 +16,30 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { uploadPropertyCoverImage } from "@/lib/supabase/property-cover-upload";
-import { DOCUMENT_KEYS, DOCUMENT_LABELS, type DocumentKey, type Property } from "@/lib/types";
+import {
+  propertyRequiresDocumentCategory,
+  type DocumentCategory,
+} from "@/lib/document-categories";
+import { type DocumentKey, type Property } from "@/lib/types";
+
+const REQUIRED_DOC_CATEGORY_UI: {
+  category: DocumentCategory;
+  title: string;
+  hint?: string;
+}[] = [
+  {
+    category: "identity",
+    title: "ID",
+    hint: "Passport, driver's licence, or other photo ID.",
+  },
+  { category: "income", title: "Proof of income" },
+  { category: "bank", title: "Bank statements" },
+  {
+    category: "rental",
+    title: "Rental history and references",
+    hint: "Reference letter or rental history.",
+  },
+];
 
 export function PropertyFormFields({
   address,
@@ -38,7 +61,7 @@ export function PropertyFormFields({
   imageUrl,
   setImageUrl,
   docs,
-  toggleDoc,
+  toggleRequiredDocCategory,
   propertyIdForCoverUpload,
   onCoverUploadStateChange,
 }: {
@@ -61,7 +84,7 @@ export function PropertyFormFields({
   imageUrl: string;
   setImageUrl: (v: string) => void;
   docs: DocumentKey[];
-  toggleDoc: (k: DocumentKey) => void;
+  toggleRequiredDocCategory: (category: DocumentCategory) => void;
   /** When editing, uploads use `{userId}/{propertyId}/…` paths. Omit on add. */
   propertyIdForCoverUpload?: string;
   /** Set while a file upload is in progress so the parent can disable form submit. */
@@ -198,13 +221,19 @@ export function PropertyFormFields({
           Applicants will be scored on completeness against this list.
         </p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {DOCUMENT_KEYS.map((k) => (
+          {REQUIRED_DOC_CATEGORY_UI.map(({ category, title, hint }) => (
             <label
-              key={k}
-              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-secondary/40"
+              key={category}
+              className="flex cursor-pointer flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-secondary/40"
             >
-              <Checkbox checked={docs.includes(k)} onCheckedChange={() => toggleDoc(k)} />
-              <span>{DOCUMENT_LABELS[k]}</span>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={propertyRequiresDocumentCategory(docs, category)}
+                  onCheckedChange={() => toggleRequiredDocCategory(category)}
+                />
+                <span className="font-medium">{title}</span>
+              </div>
+              {hint ? <p className="pl-6 text-xs text-muted-foreground">{hint}</p> : null}
             </label>
           ))}
         </div>

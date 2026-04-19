@@ -11,21 +11,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import {
+  DEFAULT_PROPERTY_REQUIRED_DOCUMENTS,
+  togglePropertyRequiredDocumentCategory,
+  type DocumentCategory,
+} from "@/lib/document-categories";
 import { useData } from "@/lib/store";
-import { DOCUMENT_KEYS, DOCUMENT_LABELS, type DocumentKey, type Property } from "@/lib/types";
-
-const DEFAULT_DOCS: DocumentKey[] = ["id", "proof_of_income", "bank_statements", "rental_history", "references"];
+import { type DocumentKey, type Property } from "@/lib/types";
 
 export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) => {
   const { addProperty } = useData();
@@ -40,17 +33,17 @@ export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) =>
   const [parking, setParking] = useState("1");
   const [status, setStatus] = useState<Property["status"]>("active");
   const [imageUrl, setImageUrl] = useState("");
-  const [docs, setDocs] = useState<DocumentKey[]>(["id", "proof_of_income", "bank_statements", "rental_history", "references"]);
+  const [docs, setDocs] = useState<DocumentKey[]>([...DEFAULT_PROPERTY_REQUIRED_DOCUMENTS]);
   const [coverUploading, setCoverUploading] = useState(false);
 
   const reset = () => {
     setAddress(""); setSuburb(""); setCity(""); setWeeklyRent("");
     setBedrooms("2"); setBathrooms("1"); setParking("1");
-    setStatus("active"); setImageUrl(""); setDocs(["id", "proof_of_income", "bank_statements", "rental_history", "references"]);
+    setStatus("active"); setImageUrl(""); setDocs([...DEFAULT_PROPERTY_REQUIRED_DOCUMENTS]);
   };
 
-  const toggleDoc = (k: DocumentKey) =>
-    setDocs((prev) => (prev.includes(k) ? prev.filter((d) => d !== k) : [...prev, k]));
+  const toggleRequiredDocCategory = (category: DocumentCategory) =>
+    setDocs((prev) => togglePropertyRequiredDocumentCategory(prev, category));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +103,7 @@ export const AddPropertyDialog = ({ trigger }: { trigger?: React.ReactNode }) =>
             imageUrl={imageUrl}
             setImageUrl={setImageUrl}
             docs={docs}
-            toggleDoc={toggleDoc}
+            toggleRequiredDocCategory={toggleRequiredDocCategory}
             onCoverUploadStateChange={setCoverUploading}
           />
           <DialogFooter>

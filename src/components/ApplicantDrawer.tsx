@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PdfIntakeFilePicker } from "./pdf-intake-file-picker";
-import { Check, Mail, Pen, Phone, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, Mail, Pen, Phone, Trash2, X } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -21,12 +21,27 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { analyzeApplicantPdfFiles, inferAnalyzeIntentFromFilename } from "@/lib/pdf/analyze-applicant-pdfs-client";
 import { useData } from "@/lib/store";
 import { effectiveTenancyMonths, rentalBehaviorLabel, scoreApplicant } from "@/lib/scoring";
 import { rentalHistoryAfterPdfDocRemoval, shouldClearPdfDerivedRentalFields } from "@/lib/rental-history-pdf-consistency";
-import { DOCUMENT_LABELS, type Applicant, type Property } from "@/lib/types";
+import {
+  DOCUMENT_CATEGORY_LABELS,
+  type DocumentCategory,
+  documentCategoryLabelForKey,
+  documentKeyCategory,
+  requiredCategoryIds,
+} from "@/lib/document-categories";
+import type { Applicant, Property } from "@/lib/types";
 import { uploadIntakePdfsBestEffort } from "@/lib/applicant-intake-storage";
 
 interface ApplicantDrawerProps {
@@ -56,6 +71,9 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     "idle",
   );
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [manualIncomeOpen, setManualIncomeOpen] = useState(false);
+  const [manualIncomeDraft, setManualIncomeDraft] = useState("");
+  const [manualIncomeSaving, setManualIncomeSaving] = useState(false);
 
   useEffect(() => {
     if (!applicant) return;
@@ -70,6 +88,8 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     setSelectedPdfFiles([]);
     setUploadState("idle");
     setUploadMessage(null);
+    setManualIncomeOpen(false);
+    setManualIncomeDraft("");
   }, [applicant, initialFocus]);
 
   if (!applicant || !property) {
@@ -82,10 +102,13 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
 
   const score = scoreApplicant(applicant, property);
   const submittedSet = new Set(applicant.submittedDocuments);
-  const missingDocuments = property.requiredDocuments.filter((doc) => !submittedSet.has(doc));
-  const submittedRequiredDocuments = property.requiredDocuments.filter((doc) => submittedSet.has(doc));
+  const missingDocuments = score.missingDocuments;
+  const satisfiedRequiredCategories = requiredCategoryIds(property.requiredDocuments).filter((cat) =>
+    applicant.submittedDocuments.some((k) => documentKeyCategory(k) === cat),
+  );
   const hasIncomeDocumentNoFigure =
-    (!applicant.weeklyIncome || applicant.weeklyIncome <= 0) && submittedSet.has("proof_of_income");
+    (!applicant.weeklyIncome || applicant.weeklyIncome <= 0) &&
+    applicant.submittedDocuments.some((d) => documentKeyCategory(d) === "income");
   const weeklyIncomeFromDocsLabel =
     applicant.weeklyIncome && applicant.weeklyIncome > 0
       ? `$${applicant.weeklyIncome} / week`
@@ -113,7 +136,7 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     let hadPdfUpload = false;
     let latest = applicant;
     if (!name.trim() || !email.trim()) {
-      toast({ title: "Missing details", description: "Name, email and weekly income are required." });
+      toast({ title: "Missing details", description: "Name and email are required." });
       return;
     }
     setSaving(true);
@@ -226,6 +249,29 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     }
   };
 
+  const saveManualIncome = async () => {
+    const parsed = Number.parseFloat(manualIncomeDraft.replace(/,/g, ""));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast({
+        title: "Invalid amount",
+        description: "Enter a weekly income greater than zero.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setManualIncomeSaving(true);
+    try {
+      await updateApplicant(applicant.id, { weeklyIncome: Math.round(parsed) });
+      toast({ title: "Income saved", description: "Weekly income has been updated." });
+      setManualIncomeOpen(false);
+      setManualIncomeDraft("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save income.";
+      toast({ title: "Save failed", description: message, variant: "destructive" });
+    } finally {
+      setManualIncomeSaving(false);
+    }
+  };
 
   const deleteCurrentApplicant = async () => {
     setDeleting(true);
@@ -317,14 +363,15 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     }
   };
 
-  const onRemoveDoc = async (doc: (typeof applicant.submittedDocuments)[number]) => {
-    const nextSubmittedDocuments = applicant.submittedDocuments.filter((d) => d !== doc);
-    const shouldClear = shouldClearPdfDerivedRentalFields(doc, nextSubmittedDocuments);
-    const nextRentalHistory = rentalHistoryAfterPdfDocRemoval(
-      applicant.rentalHistory,
-      doc,
-      nextSubmittedDocuments,
-    );
+  const onRemoveDocumentCategory = async (cat: DocumentCategory) => {
+    const removedInCat = applicant.submittedDocuments.filter((k) => documentKeyCategory(k) === cat);
+    const nextSubmittedDocuments = applicant.submittedDocuments.filter((k) => documentKeyCategory(k) !== cat);
+    const rentalRemoved = removedInCat.find((d) => d === "rental_history" || d === "references");
+    const nextRentalHistory = rentalRemoved
+      ? rentalHistoryAfterPdfDocRemoval(applicant.rentalHistory, rentalRemoved, nextSubmittedDocuments)
+      : applicant.rentalHistory;
+    const shouldClear =
+      rentalRemoved != null && shouldClearPdfDerivedRentalFields(rentalRemoved, nextSubmittedDocuments);
     setSaving(true);
     try {
       await updateApplicant(applicant.id, {
@@ -416,9 +463,26 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
                 <span className="font-semibold text-foreground">{score.rentToIncomeRatio.toFixed(1)}x</span>
               </p>
               {hasIncomeDocumentNoFigure ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Proof of income is on file, but no amount was parsed from the PDF text layer.
-                </p>
+                <div className="mt-2 flex flex-col gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-900">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-700" aria-hidden />
+                    <p className="text-xs leading-relaxed">
+                      Proof of income is on file, but no amount was parsed from the PDF text layer.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit self-start border-yellow-300 bg-background hover:bg-yellow-100/80"
+                    onClick={() => {
+                      setManualIncomeDraft("");
+                      setManualIncomeOpen(true);
+                    }}
+                  >
+                    Add income manually
+                  </Button>
+                </div>
               ) : null}
             </section>
 
@@ -426,16 +490,16 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
 
             <section>
               <h4 className="text-sm font-semibold">Submitted documents</h4>
-              {submittedRequiredDocuments.length === 0 ? (
+              {satisfiedRequiredCategories.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">No submitted required documents.</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
-                  {submittedRequiredDocuments.map((doc) => (
+                  {satisfiedRequiredCategories.map((cat) => (
                     <li
-                      key={doc}
+                      key={cat}
                       className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm"
                     >
-                      <span className="text-foreground">{DOCUMENT_LABELS[doc]}</span>
+                      <span className="text-foreground">{DOCUMENT_CATEGORY_LABELS[cat]}</span>
                       <div className="flex items-center gap-2">
                         <span className="inline-flex items-center gap-1 text-xs font-semibold text-tier-good">
                           <Check className="h-3.5 w-3.5" /> Submitted
@@ -445,7 +509,7 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                          onClick={() => void onRemoveDoc(doc)}
+                          onClick={() => void onRemoveDocumentCategory(cat)}
                           disabled={saving || deleting}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -497,7 +561,7 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
                       key={doc}
                       className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm"
                     >
-                      <span className="text-foreground">{DOCUMENT_LABELS[doc]}</span>
+                      <span className="text-foreground">{documentCategoryLabelForKey(doc)}</span>
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-tier-bad">
                         <X className="h-3.5 w-3.5" /> Missing
                       </span>
@@ -540,16 +604,16 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
 
             <div>
               <Label className="text-sm font-semibold">Documents submitted</Label>
-              {submittedRequiredDocuments.length === 0 ? (
+              {satisfiedRequiredCategories.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">No submitted required documents.</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
-                  {submittedRequiredDocuments.map((doc) => (
+                  {satisfiedRequiredCategories.map((cat) => (
                     <li
-                      key={doc}
+                      key={cat}
                       className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm"
                     >
-                      <span className="text-foreground">{DOCUMENT_LABELS[doc]}</span>
+                      <span className="text-foreground">{DOCUMENT_CATEGORY_LABELS[cat]}</span>
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-tier-good">
                         <Check className="h-3.5 w-3.5" /> Submitted
                       </span>
@@ -634,6 +698,47 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
             </div>
           </div>
         )}
+
+        <Dialog open={manualIncomeOpen} onOpenChange={setManualIncomeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add weekly income</DialogTitle>
+              <DialogDescription>
+                Documents are on file but no amount was parsed. Enter the applicant&apos;s weekly income in dollars
+                per week to update scoring.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-1.5">
+              <Label htmlFor="manual-weekly-income" className="text-xs font-medium text-muted-foreground">
+                Weekly income ($/wk)
+              </Label>
+              <Input
+                id="manual-weekly-income"
+                type="number"
+                inputMode="decimal"
+                min={1}
+                step={1}
+                value={manualIncomeDraft}
+                onChange={(e) => setManualIncomeDraft(e.target.value)}
+                placeholder="e.g. 1200"
+                disabled={manualIncomeSaving}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setManualIncomeOpen(false)}
+                disabled={manualIncomeSaving}
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={() => void saveManualIncome()} disabled={manualIncomeSaving}>
+                {manualIncomeSaving ? "Saving..." : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

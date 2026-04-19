@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "run:payslip-income": "node --import tsx scripts/run-payslip-income.mjs",
     "test:e2e:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
-    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test"
+    "test:e2e": "PLAYWRIGHT_BROWSERS_PATH=0 playwright test",
+    "reset:app-data": "CONFIRM_RESET=yes node --env-file=.env.local scripts/reset-app-data.mjs",
+    "reset:full": "CONFIRM_RESET=yes DELETE_AUTH_USERS=yes node --env-file=.env.local scripts/reset-app-data.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -12,6 +12,10 @@ import {
 import { PropertyFormFields } from "@/components/PropertyFormFields";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/lib/store";
+import {
+  togglePropertyRequiredDocumentCategory,
+  type DocumentCategory,
+} from "@/lib/document-categories";
 import { type DocumentKey, type Property } from "@/lib/types";
 
 export function EditPropertyDialog({
@@ -51,8 +55,8 @@ export function EditPropertyDialog({
     setDocs([...property.requiredDocuments]);
   }, [open, property]);
 
-  const toggleDoc = (k: DocumentKey) =>
-    setDocs((prev) => (prev.includes(k) ? prev.filter((d) => d !== k) : [...prev, k]));
+  const toggleRequiredDocCategory = (category: DocumentCategory) =>
+    setDocs((prev) => togglePropertyRequiredDocumentCategory(prev, category));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +117,7 @@ export function EditPropertyDialog({
             imageUrl={imageUrl}
             setImageUrl={setImageUrl}
             docs={docs}
-            toggleDoc={toggleDoc}
+            toggleRequiredDocCategory={toggleRequiredDocCategory}
             propertyIdForCoverUpload={property.id}
             onCoverUploadStateChange={setCoverUploading}
           />

@@ -13,7 +13,7 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^\w.-]+/g, "_");
 }
 
-function isPdfLike(file: File): boolean {
+export function isPdfLike(file: File): boolean {
   const lowerName = file.name.toLowerCase();
   const lowerType = (file.type ?? "").toLowerCase();
   return lowerType === "application/pdf" || lowerName.endsWith(".pdf");

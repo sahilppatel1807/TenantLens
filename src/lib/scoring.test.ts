@@ -232,4 +232,28 @@ describe("scoreApplicant", () => {
     expect(result.total).toBe(result.completeness + result.income + result.history);
     expect(result.tier).toBe(tierFor(result.total));
   });
+
+  it("treats passport as satisfying the identity category when only id is required", () => {
+    const p = baseProperty({ requiredDocuments: ["id", "proof_of_income"] });
+    const a = baseApplicant({ submittedDocuments: ["passport", "proof_of_income"] });
+    const result = scoreApplicant(a, p);
+    expect(result.completeness).toBe(50);
+    expect(result.missingDocuments).toEqual([]);
+  });
+
+  it("counts duplicate required keys in the same category once for completeness", () => {
+    const p = baseProperty({ requiredDocuments: ["id", "passport", "proof_of_income"] });
+    const a = baseApplicant({ submittedDocuments: ["proof_of_income"] });
+    const result = scoreApplicant(a, p);
+    expect(result.completeness).toBe(Math.round((1 / 2) * 50));
+    expect(result.missingDocuments).toEqual(["id"]);
+  });
+
+  it("treats references as satisfying rental_history in the same category", () => {
+    const p = baseProperty({ requiredDocuments: ["id", "rental_history"] });
+    const a = baseApplicant({ submittedDocuments: ["id", "references"] });
+    const result = scoreApplicant(a, p);
+    expect(result.completeness).toBe(50);
+    expect(result.missingDocuments).toEqual([]);
+  });
 });

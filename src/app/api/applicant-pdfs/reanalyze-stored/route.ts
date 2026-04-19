@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { processApplicantPdfBuffer } from "@/lib/pdf/process-applicant-pdf-buffer";
 import { normalizeDocumentKeys } from "@/lib/db/mappers";
+import { documentKeyCategory } from "@/lib/document-categories";
 import { DOCUMENT_KEYS, type DocumentKey } from "@/lib/types";
 import {
   mergeReferenceLetterFieldsFromAnalyzeResults,
@@ -137,10 +138,10 @@ for (const doc of (docs ?? []) as StoredDocRow[]) {
       referenceExtractionFailed: currentManualReviewRaw.referenceExtractionFailed === true,
     };
 
-    // For completeness, only required documents matter, but for evidence, keep all
+    // For completeness, only required categories matter, but for evidence, keep all
     const allEvidence = Array.from(new Set([...existingSubmitted, ...mappedFromAnalyze]));
-    const allowed = new Set(requiredDocuments);
-    const nextSubmitted = allEvidence.filter((d) => allowed.has(d));
+    const requiredCategories = new Set(requiredDocuments.map(documentKeyCategory));
+    const nextSubmitted = allEvidence.filter((d) => requiredCategories.has(documentKeyCategory(d)));
 
     const mergedReference = mergeReferenceLetterFieldsFromAnalyzeResults(analyzeResults);
     const currentRental =

@@ -1,3 +1,4 @@
+import { missingRepresentativeRequiredKeys, requiredCategoryIds, documentKeyCategory } from "./document-categories";
 import type { Applicant, DocumentKey, Property, RecommendationSentiment, RentalHistory, Tier } from "./types";
 
 export interface ScoreBreakdown {
@@ -73,9 +74,13 @@ export function rentalBehaviorLabel(h: RentalHistory): "Good" | "None" {
 
 export function scoreApplicant(applicant: Applicant, property: Property): ScoreBreakdown {
   const required = property.requiredDocuments;
-  const missing = required.filter((d) => !applicant.submittedDocuments.includes(d));
+  const requiredCats = requiredCategoryIds(required);
+  const missing = missingRepresentativeRequiredKeys(required, applicant.submittedDocuments);
+  const satisfiedCatCount = requiredCats.filter((cat) =>
+    applicant.submittedDocuments.some((k) => documentKeyCategory(k) === cat),
+  ).length;
   const completeness =
-    required.length === 0 ? 50 : Math.round(((required.length - missing.length) / required.length) * 50);
+    requiredCats.length === 0 ? 50 : Math.round((satisfiedCatCount / requiredCats.length) * 50);
 
   const ratio = property.weeklyRent > 0 && applicant.weeklyIncome > 0
     ? applicant.weeklyIncome / property.weeklyRent

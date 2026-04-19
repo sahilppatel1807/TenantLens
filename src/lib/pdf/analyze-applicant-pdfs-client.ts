@@ -9,8 +9,11 @@ type AnalyzeIntent = {
 
 export type ApplicantPdfAnalyzeIntent = AnalyzeIntent;
 
-export function inferAnalyzeIntentFromFilename(filename: string): AnalyzeIntent {
-  const displayType = classifyDocumentFromFilename(filename);
+export function inferAnalyzeIntentFromFilename(
+  filename: string,
+  applicantName?: string | null,
+): AnalyzeIntent {
+  const displayType = classifyDocumentFromFilename(filename, applicantName);
   switch (displayType) {
     case "payslip":
       return { documentKey: "proof_of_income", slot: "proof_of_income" };
@@ -33,6 +36,7 @@ export function inferAnalyzeIntentFromFilename(filename: string): AnalyzeIntent 
 export async function analyzeApplicantPdfFiles(
   files: File[],
   intents?: ApplicantPdfAnalyzeIntent[],
+  applicantNameForFilename?: string | null,
 ): Promise<ApplicantPdfAnalyzeResultItem[]> {
   const results: ApplicantPdfAnalyzeResultItem[] = [];
 
@@ -40,7 +44,8 @@ export async function analyzeApplicantPdfFiles(
     const file = files[index];
     const form = new FormData();
     form.append("files", file);
-    const intent = intents?.[index] ?? inferAnalyzeIntentFromFilename(file.name);
+    const intent =
+      intents?.[index] ?? inferAnalyzeIntentFromFilename(file.name, applicantNameForFilename);
     if (intent.documentKey) {
       form.append("documentKey", intent.documentKey);
     }
