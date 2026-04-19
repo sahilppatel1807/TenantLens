@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { DashboardNav } from "@/components/DashboardNav";
 import { ApplicantRow } from "@/components/ApplicantRow";
-import { ApplicantDrawer as ApplicantDrawer2 } from "@/components/ApplicantDrawer2";
+import { ApplicantDrawer } from "@/components/ApplicantDrawer";
 import { CompareDialog } from "@/components/CompareDialog";
 import { AddApplicantDialog } from "@/components/AddApplicantDialog";
 import { EditPropertyDialog } from "@/components/EditPropertyDialog";
@@ -256,7 +256,7 @@ export function PropertyDetailPage({ propertyId }: { propertyId: string }) {
         </section>
       </main>
 
-      <ApplicantDrawer2
+      <ApplicantDrawer
         applicant={activeApplicant}
         property={property}
         initialFocus={drawerInitialFocus}

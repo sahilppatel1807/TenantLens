@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Pen, Search } from "lucide-react";
 import { DashboardNav } from "@/components/DashboardNav";
-import { ApplicantDrawer as ApplicantDrawer2 } from "@/components/ApplicantDrawer2";
+import { ApplicantDrawer } from "@/components/ApplicantDrawer";
 import { ScoreRing } from "@/components/ScoreRing";
 import { TierBadge } from "@/components/TierBadge";
 import { ApplicantStatusBadge } from "@/components/ApplicantStatusActions";
@@ -168,7 +168,7 @@ export function ApplicantsPage() {
         </p>
       </main>
 
-      <ApplicantDrawer2
+      <ApplicantDrawer
         applicant={selected?.a ?? null}
         property={selected?.p ?? null}
         initialFocus={drawerInitialFocus}

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { analyzePayslipPdfBuffer } from "./index";
+import { analyzePayslipPdfBuffer } from "./parse-payslip-income";
 
 const runPdfFixtureTests = process.env.RUN_PDF_INCOME_FIXTURE_TESTS === "1";
 const fixturesDir = join(process.cwd(), "local-pdf-fixtures");

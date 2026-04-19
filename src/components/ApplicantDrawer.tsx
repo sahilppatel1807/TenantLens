@@ -62,8 +62,6 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [occupation, setOccupation] = useState("");
-  // Phase 2: Remove manual weeklyIncome input
-// const [weeklyIncome, setWeeklyIncome] = useState("");
   const [historyNotes, setHistoryNotes] = useState("");
   const [agentNotes, setAgentNotes] = useState("");
   const [selectedPdfFiles, setSelectedPdfFiles] = useState<File[]>([]);
@@ -82,7 +80,6 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     setEmail(applicant.email);
     setPhone(applicant.phone);
     setOccupation(applicant.occupation);
-    // setWeeklyIncome(String(applicant.weeklyIncome));
     setHistoryNotes(applicant.rentalHistory.notes ?? "");
     setAgentNotes(applicant.notes ?? "");
     setSelectedPdfFiles([]);
@@ -125,7 +122,6 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     email !== applicant.email ||
     phone !== applicant.phone ||
     occupation !== applicant.occupation ||
-    // weeklyIncome !== String(applicant.weeklyIncome) ||
     historyNotes !== (applicant.rentalHistory.notes ?? "") ||
     agentNotes !== (applicant.notes ?? "");
 

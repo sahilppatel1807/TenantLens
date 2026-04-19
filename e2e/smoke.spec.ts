@@ -4,7 +4,7 @@ test.describe("public marketing", () => {
   test("home page shows hero and primary CTA", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: /Review rental applicants/i })).toBeVisible();
-    await expect(page.getByRole("main").getByRole("link", { name: /Start free/i })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: /Start free/i }).first()).toBeVisible();
   });
 
   test("register page loads", async ({ page }) => {
@@ -42,7 +42,7 @@ test.describe("login validation", () => {
     await page.getByLabel(/^Password$/i).fill("wrong-password-12345!");
     await page.getByRole("button", { name: /^Log in$/i }).click();
 
-    await expect(page.getByText(/Sign in failed|Configuration error/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Sign in failed|Configuration error/i).first()).toBeVisible({ timeout: 15_000 });
   });
 });
 
