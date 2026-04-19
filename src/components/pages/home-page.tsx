@@ -93,9 +93,9 @@ export function HomePage() {
                 </Button>
               </div>
               <ul className="flex flex-wrap gap-x-6 gap-y-2 pt-4 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> No credit card</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Setup in 2 minutes</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Cancel anytime</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Try 3 listings free</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Review applicants in minutes</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-accent" /> Only pay for active properties</li>
               </ul>
             </div>
             <div className="relative animate-fade-in">
