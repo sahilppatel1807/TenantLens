@@ -20,10 +20,20 @@ function toDocumentKey(value: string): DocumentKey | null {
   return DOCUMENT_KEYS.includes(value as DocumentKey) ? (value as DocumentKey) : null;
 }
 
+function isDebugEnabled(requested: boolean): boolean {
+  // Enable by request flag, explicit env var, or local dev default.
+  if (requested) return true;
+  if (process.env.PDF_REANALYZE_DEBUG === "1") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
 export async function POST(request: Request) {
   try {
-    const body = (await request.json().catch(() => null)) as { applicantId?: string } | null;
+    const body = (await request.json().catch(() => null)) as
+      | { applicantId?: string; debug?: boolean }
+      | null;
     const applicantId = body?.applicantId?.trim();
+    const debug = isDebugEnabled(body?.debug === true);
     if (!applicantId) {
       return Response.json({ error: "Missing applicantId" }, { status: 400 });
     }
@@ -72,6 +82,7 @@ export async function POST(request: Request) {
     const analyzeResults: Array<{
       displayType: "payslip" | "bank_statement" | "employment_letter" | "rental_history" | "references" | "photo_id" | "unknown";
       extractionStatus: "success" | "failed";
+      errorMessage?: string;
       monthsRenting: number | null;
       recommendationSentiment: "strong" | "neutral" | "negative" | null;
       weeklyIncome: number | null;
@@ -98,6 +109,30 @@ for (const doc of (docs ?? []) as StoredDocRow[]) {
     slot: doc.document_key,
   });
 
+  if (
+    debug &&
+    (doc.document_key === "references" ||
+      doc.document_key === "rental_history" ||
+      analyzed.displayType === "references" ||
+      analyzed.displayType === "rental_history")
+  ) {
+    console.info(
+      "[reanalyze-stored][rental-debug]",
+      JSON.stringify({
+        applicantId,
+        storagePath: doc.storage_path,
+        originalFilename: doc.original_filename,
+        documentKey: doc.document_key,
+        analyzedDisplayType: analyzed.displayType,
+        analyzedExtractionStatus: analyzed.extractionStatus,
+        ...(analyzed.errorMessage ? { analyzedErrorMessage: analyzed.errorMessage } : {}),
+        analyzedMonthsRenting: analyzed.monthsRenting,
+        analyzedRecommendationSentiment: analyzed.recommendationSentiment,
+        needsReview: analyzed.needsReview,
+      }),
+    );
+  }
+
   mappedFromAnalyze.push(...analyzed.mappedDocumentKeys);
   if (analyzed.extractionStatus === "success" && analyzed.weeklyIncome != null && analyzed.weeklyIncome > 0) {
     nextWeeklyIncome = Math.max(nextWeeklyIncome, Math.round(analyzed.weeklyIncome));
@@ -105,6 +140,7 @@ for (const doc of (docs ?? []) as StoredDocRow[]) {
   analyzeResults.push({
     displayType: analyzed.displayType,
     extractionStatus: analyzed.extractionStatus,
+    ...(analyzed.errorMessage ? { errorMessage: analyzed.errorMessage } : {}),
     monthsRenting: analyzed.monthsRenting,
     recommendationSentiment: analyzed.recommendationSentiment,
     weeklyIncome: analyzed.weeklyIncome,

@@ -170,6 +170,25 @@ function parseMonthYearToken(monthRaw: string, yearRaw: string): Date | null {
   return new Date(Date.UTC(year, monthIdx, 1));
 }
 
+function parseDayMonthYearToken(dayRaw: string, monthRaw: string, yearRaw: string): Date | null {
+  const day = Number(dayRaw);
+  const monthIdx = MONTH_NAME_TO_INDEX[monthRaw.trim().toLowerCase()];
+  const year = Number(yearRaw);
+  if (!Number.isFinite(day) || day < 1 || day > 31) return null;
+  if (monthIdx == null) return null;
+  if (!Number.isFinite(year) || year < 1900 || year > 2100) return null;
+
+  const value = new Date(Date.UTC(year, monthIdx, day));
+  if (
+    value.getUTCFullYear() !== year ||
+    value.getUTCMonth() !== monthIdx ||
+    value.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return value;
+}
+
 /** Spelled-out or numeric durations, e.g. "twelve months", "two years", "a year". */
 function extractMonthsFromSpelledDurations(text: string): number | null {
   let best: number | null = null;
@@ -253,18 +272,55 @@ function extractMonthsFromMonthNameRanges(text: string): number | null {
   return best;
 }
 
+/**
+ * Ranges like "1 January 2024 to 31 March 2025" or
+ * "tenancy period 01 Feb 2023 - 14 Apr 2024".
+ */
+function extractMonthsFromDayMonthNameRanges(text: string): number | null {
+  const sample = text.slice(0, 50_000);
+  const monthPart = String.raw`(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)`;
+  const connectorPart = String.raw`(?:to|until|through|–|-)`;
+  const dayMonthRange = new RegExp(
+    `\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${monthPart})\\s*,?\\s*(\\d{4})\\s*${connectorPart}\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(${monthPart})\\s*,?\\s*(\\d{4})\\b`,
+    "gi",
+  );
+  const rentalContext = /\b(?:tenancy|rental|lease|rented|rent)\b/i;
+
+  let best: number | null = null;
+  for (const m of Array.from(sample.matchAll(dayMonthRange))) {
+    const start = parseDayMonthYearToken(m[1] ?? "", m[2] ?? "", m[3] ?? "");
+    const end = parseDayMonthYearToken(m[4] ?? "", m[5] ?? "", m[6] ?? "");
+    if (!start || !end || end < start) continue;
+
+    const matchIndex = m.index ?? 0;
+    const contextStart = Math.max(0, matchIndex - 60);
+    const contextEnd = Math.min(sample.length, matchIndex + (m[0]?.length ?? 0) + 60);
+    const context = sample.slice(contextStart, contextEnd);
+    const hasFromTo = /\bfrom\b/i.test(context) && /\b(?:to|until|through)\b/i.test(context);
+    if (!hasFromTo && !rentalContext.test(context)) continue;
+
+    const months = monthDiffFloor(start, end);
+    if (best == null || months > best) best = months;
+  }
+  return best;
+}
+
 function extractMonthsFromSinceMonthYear(text: string): number | null {
   // e.g. 'since March 2023', 'Reference written May 2024'
   const sinceRe = /since\s+([a-zA-Z]+)\s+(\d{4})/i;
   const refRe = /reference written ([a-zA-Z]+)\s+(\d{4})/i;
   const sinceMatch = text.match(sinceRe);
   const refMatch = text.match(refRe);
-  if (sinceMatch && refMatch) {
-    const start = parseMonthYearToken(sinceMatch[1], sinceMatch[2]);
-    const end = parseMonthYearToken(refMatch[1], refMatch[2]);
-    if (start && end && end > start) {
-      return monthDiffFloor(start, end);
-    }
+  if (!sinceMatch) return null;
+
+  const start = parseMonthYearToken(sinceMatch[1], sinceMatch[2]);
+  if (!start) return null;
+
+  const end = refMatch
+    ? parseMonthYearToken(refMatch[1], refMatch[2])
+    : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+  if (start && end && end > start) {
+    return monthDiffFloor(start, end);
   }
   return null;
 }
@@ -281,6 +337,45 @@ function extractMonthsFromYYYYMMRange(text: string): number | null {
     }
   }
   return null;
+}
+
+function extractMonthsFromOpenEndedDateRanges(text: string): number | null {
+  const sample = text.slice(0, 50_000);
+
+  // e.g. "Jan 2023 to present", "March 2022 until current"
+  const monthPart = String.raw`(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)`;
+  const monthToPresent = new RegExp(
+    `\\b(${monthPart})\\s+(\\d{4})\\s*(?:to|until|through|–|-)\\s*(?:present|current|now|today)\\b`,
+    "gi",
+  );
+
+  const nowMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+  let best: number | null = null;
+
+  for (const m of Array.from(sample.matchAll(monthToPresent))) {
+    const start = parseMonthYearToken(m[1] ?? "", m[2] ?? "");
+    if (!start || nowMonth <= start) continue;
+    const months = monthDiffFloor(start, nowMonth);
+    if (best == null || months > best) best = months;
+  }
+
+  // e.g. "from 2022 to present", "2021-2024", "2020 to current"
+  const yearRange = /\b(?:from\s+)?(\d{4})\s*(?:to|until|through|–|-)\s*(\d{4}|present|current|now|today)\b/gi;
+  for (const m of Array.from(sample.matchAll(yearRange))) {
+    const startYear = Number(m[1]);
+    if (!Number.isFinite(startYear) || startYear < 1900 || startYear > 2100) continue;
+    const endRaw = (m[2] ?? "").toLowerCase();
+    const endDate =
+      endRaw === "present" || endRaw === "current" || endRaw === "now" || endRaw === "today"
+        ? nowMonth
+        : new Date(Date.UTC(Number(endRaw), 0, 1));
+    const startDate = new Date(Date.UTC(startYear, 0, 1));
+    if (endDate <= startDate) continue;
+    const months = monthDiffFloor(startDate, endDate);
+    if (best == null || months > best) best = months;
+  }
+
+  return best;
 }
 
 function extractMonthsRenting(text: string): number | null {
@@ -302,11 +397,21 @@ function extractMonthsRenting(text: string): number | null {
 
   const fromSpelled = extractMonthsFromSpelledDurations(text);
   const fromMonthNames = extractMonthsFromMonthNameRanges(text);
+  const fromDayMonthNames = extractMonthsFromDayMonthNameRanges(text);
 
   const fromSince = extractMonthsFromSinceMonthYear(text);
   const fromYYYYMM = extractMonthsFromYYYYMMRange(text);
+  const fromOpenEndedRanges = extractMonthsFromOpenEndedDateRanges(text);
 
-  const candidates = [fromNumericDates, fromSpelled, fromMonthNames, fromSince, fromYYYYMM].filter(
+  const candidates = [
+    fromNumericDates,
+    fromSpelled,
+    fromMonthNames,
+    fromDayMonthNames,
+    fromSince,
+    fromYYYYMM,
+    fromOpenEndedRanges,
+  ].filter(
     (n): n is number => n != null && n > 0,
   );
   if (candidates.length === 0) return null;
@@ -335,7 +440,15 @@ function extractRecommendationSentiment(
 }
 
 export function parseReferenceLetterText(rawText: string): ReferenceLetterExtraction {
-  const text = rawText.slice(0, 50_000);
+  const text = rawText
+    .slice(0, 50_000)
+    // Normalize common Unicode dash variants from PDF extraction.
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    // Normalize spacing/newlines around numeric date separators.
+    .replace(/(\d)\s*[./-]\s*(\d)/g, "$1-$2")
+    // Flatten whitespace so phrase/date-range regexes survive line wraps.
+    .replace(/\s+/g, " ")
+    .trim();
   return {
     monthsRenting: extractMonthsRenting(text),
     recommendationSentiment: extractRecommendationSentiment(text),

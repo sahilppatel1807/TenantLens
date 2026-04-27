@@ -35,6 +35,10 @@ import { useData } from "@/lib/store";
 import { effectiveTenancyMonths, rentalBehaviorLabel, scoreApplicant } from "@/lib/scoring";
 import { rentalHistoryAfterPdfDocRemoval, shouldClearPdfDerivedRentalFields } from "@/lib/rental-history-pdf-consistency";
 import {
+  mergeReferenceLetterFieldsFromAnalyzeResults,
+  recommendationSentimentToReferenceQuality,
+} from "@/lib/rental-history-from-pdf";
+import {
   DOCUMENT_CATEGORY_LABELS,
   type DocumentCategory,
   documentCategoryLabelForKey,
@@ -139,6 +143,7 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
     try {
       let analyzedResults = null;
       let hasUnknownOrFailedReference = false;
+      let analyzedRentalFallback: Applicant["rentalHistory"] | null = null;
       if (selectedPdfFiles.length > 0) {
         setUploadState("analyzing");
         setUploadMessage("Analyzing selected PDFs...");
@@ -146,6 +151,27 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
           selectedPdfFiles,
           selectedPdfFiles.map((file) => inferAnalyzeIntentFromFilename(file.name)),
         );
+        const mergedReference = mergeReferenceLetterFieldsFromAnalyzeResults(analyzedResults);
+        analyzedRentalFallback = {
+          ...applicant.rentalHistory,
+          ...(mergedReference.monthsRenting != null && mergedReference.monthsRenting > 0
+            ? {
+                monthsRenting:
+                  applicant.rentalHistory.monthsRenting != null &&
+                  applicant.rentalHistory.monthsRenting > 0
+                    ? Math.max(applicant.rentalHistory.monthsRenting, mergedReference.monthsRenting)
+                    : mergedReference.monthsRenting,
+              }
+            : {}),
+          ...(mergedReference.recommendationSentiment != null
+            ? {
+                recommendationSentiment: mergedReference.recommendationSentiment,
+                referenceQuality: recommendationSentimentToReferenceQuality(
+                  mergedReference.recommendationSentiment,
+                ),
+              }
+            : {}),
+        };
         hasUnknownOrFailedReference = analyzedResults.some(
           (row) =>
             (row.displayType === "rental_history" || row.displayType === "references") &&
@@ -199,19 +225,14 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
       // After PDF upload, `/api/applicant-pdfs/reanalyze-stored` already persisted weekly income,
       // submitted documents, and rental fields from PDFs. Do not PATCH those from `latest` here —
       // a stale `refreshData()` result would overwrite correct DB values with 0 / old lists.
+      // Keep this update focused on contact/profile fields only.
       await updateApplicant(applicant.id, {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
         occupation: occupation.trim(),
-        ...(hadPdfUpload
+        ...(!hadPdfUpload
           ? {
-              rentalHistory: {
-                ...latest.rentalHistory,
-                notes: historyNotes.trim() || undefined,
-              },
-            }
-          : {
               weeklyIncome: applicant.weeklyIncome,
               submittedDocuments: applicant.submittedDocuments,
               rentalHistory: {
@@ -222,7 +243,15 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
                 monthsRenting: applicant.rentalHistory.monthsRenting,
                 recommendationSentiment: applicant.rentalHistory.recommendationSentiment,
               },
-            }),
+            }
+          : analyzedRentalFallback
+            ? {
+                rentalHistory: {
+                  ...analyzedRentalFallback,
+                  notes: historyNotes.trim() || undefined,
+                },
+              }
+            : {}),
         notes: agentNotes.trim() || undefined,
       });
       toast({

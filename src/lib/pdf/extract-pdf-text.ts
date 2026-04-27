@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 type PdfParseCtor = new (options: { data: Buffer | Uint8Array }) => {
   getText: () => Promise<{ text?: string | null }>;
@@ -14,14 +14,38 @@ type PdfParseModule = {
 
 let cachedCtor: PdfParseCtor | null = null;
 
+function resolveWorkerSrc(require: NodeRequire): string | null {
+  const candidates = [
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+    "pdfjs-dist/build/pdf.worker.mjs",
+    "pdf-parse",
+  ];
+
+  for (const id of candidates) {
+    try {
+      const resolved = require.resolve(id);
+      // For `pdf-parse`, this resolves to .../dist/pdf-parse/cjs/index.cjs;
+      // replace with sibling worker file.
+      const fsPath =
+        id === "pdf-parse"
+          ? resolved.replace(/index\.cjs$/, "pdf.worker.mjs")
+          : resolved;
+      return pathToFileURL(fsPath).href;
+    } catch {
+      // Try next candidate.
+    }
+  }
+
+  return null;
+}
+
 function getPdfParseCtor(): PdfParseCtor {
   if (cachedCtor) return cachedCtor;
   const require = createRequire(import.meta.url);
   const mod = require("pdf-parse") as PdfParseModule;
   if (!mod.PDFParse) throw new Error("pdf-parse failed to load");
-  const resolvedEntry = require.resolve("pdf-parse");
-  const workerPath = join(dirname(resolvedEntry), "pdf.worker.mjs");
-  mod.PDFParse.setWorker?.(workerPath);
+  const workerSrc = resolveWorkerSrc(require);
+  if (workerSrc) mod.PDFParse.setWorker?.(workerSrc);
   cachedCtor = mod.PDFParse;
   return cachedCtor;
 }

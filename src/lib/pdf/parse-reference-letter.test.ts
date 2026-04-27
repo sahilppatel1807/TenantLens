@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { parseReferenceLetterText } from "./parse-reference-letter";
 
+function monthDiffFloorForTest(start: Date, end: Date): number {
+  let months =
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    (end.getUTCMonth() - start.getUTCMonth());
+  if (end.getUTCDate() < start.getUTCDate()) months -= 1;
+  return Math.max(months, 0);
+}
+
 describe("parseReferenceLetterText", () => {
   it("extracts tenancy months from a DD-MM-YYYY date range", () => {
     const text = `
@@ -121,4 +129,86 @@ it("extracts months from 'from 2022-03 to 2023-05' phrasing", () => {
   const text = `Rental from 2022-03 to 2023-05. Good tenant.`;
   const result = parseReferenceLetterText(text);
   expect(result.monthsRenting).toBe(14);
+});
+
+it("extracts months from 'since Month Year' when no written date is present", () => {
+  const text = `The tenant has rented this unit since March 2023 and has always paid on time.`;
+  const result = parseReferenceLetterText(text);
+  const nowMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+  const expected = monthDiffFloorForTest(new Date(Date.UTC(2023, 2, 1)), nowMonth);
+  expect(result.monthsRenting).toBe(expected);
+});
+
+it("extracts months from open-ended year ranges like 'from 2022 to present'", () => {
+  const text = `Rental period from 2022 to present. The tenant is recommended.`;
+  const result = parseReferenceLetterText(text);
+  const nowMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+  const expected = monthDiffFloorForTest(new Date(Date.UTC(2022, 0, 1)), nowMonth);
+  expect(result.monthsRenting).toBe(expected);
+});
+
+it("extracts provided reference-letter sample with day-month-year range", () => {
+  const text = `
+    15-04-2026
+    To whom it may concern,
+    I would like to inform you that Sahil Patel rented a one-bedroom apartment at 329 walter rd, west
+    from 08-02-2025 to 14-04-2026.
+    During his/her tenure, he/she paid rent on time and took care of the property.
+    He/She informed me that he/she was moving out months in advance and I had no issue
+    recommending him/her as a tenant.
+    I highly recommend him/her as a tenant.
+  `;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+  expect(result.recommendationSentiment).toBe("strong");
+});
+
+it("extracts date ranges even when PDF text wraps inside dates", () => {
+  const text = `
+    Tenancy period from 08-02-
+    2025 to 14 - 04 - 2026.
+    Paid rent on time. Highly recommended.
+  `;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+  expect(result.recommendationSentiment).toBe("strong");
+});
+
+it("extracts months from day-month-name sentence range", () => {
+  const text = `
+    Rental period from 1 Jan 2024 to 31 Mar 2025.
+    Tenant paid rent on time and was recommended.
+  `;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+});
+
+it("extracts months from abbreviated day-month-name range with hyphen", () => {
+  const text = `
+    Tenancy period 01 Feb 2023 - 14 Apr 2024.
+    No issues and highly recommended.
+  `;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+  expect(result.recommendationSentiment).toBe("strong");
+});
+
+it("extracts months from wrapped day-month-name range", () => {
+  const text = `
+    Tenant occupied the property from 1 Jan
+    2024 to 31 Mar 2025 and always paid rent
+    on time.
+  `;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBe(14);
+});
+
+it("does not infer tenancy months from unrelated day-month-name dates", () => {
+  const text = `
+    Date of issue: 1 Jan 2024.
+    Date of birth: 31 Mar 1990.
+    Character reference attached.
+  `;
+  const result = parseReferenceLetterText(text);
+  expect(result.monthsRenting).toBeNull();
 });
