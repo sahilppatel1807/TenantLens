@@ -8,6 +8,13 @@ const nextConfig = {
       "pdfjs-dist",
       "@napi-rs/canvas",
     ],
+    // Ensure native canvas binaries are traced into serverless bundles in production.
+    outputFileTracingIncludes: {
+      "/api/**/*": [
+        "./node_modules/@napi-rs/canvas/**/*",
+        "./node_modules/@emnapi/runtime/**/*",
+      ],
+    },
   },
   async redirects() {
     return [
