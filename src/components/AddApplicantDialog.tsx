@@ -66,7 +66,24 @@ type SaveApplicantInput = {
   agentNotes: string;
   onStage?: (stage: "analyzing" | "saving") => void;
   updateReferenceWarning?: boolean;
+  deferRefresh?: boolean;
 };
+
+type BulkProgressState = {
+  total: number;
+  processed: number;
+  succeeded: number;
+  failed: number;
+  stageMessage: string;
+};
+
+const initialBulkProgressState = (): BulkProgressState => ({
+  total: 0,
+  processed: 0,
+  succeeded: 0,
+  failed: 0,
+  stageMessage: "",
+});
 
 function applicantNameSlugForExamples(fullName: string): string {
   const t = fullName.trim();
@@ -98,6 +115,7 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
   const [bulkCandidates, setBulkCandidates] = useState<BulkCandidate[]>([]);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkDropHighlight, setBulkDropHighlight] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<BulkProgressState>(initialBulkProgressState);
   const hasSelectedPdfs = selectedPdfFiles.length > 0;
   const folderInputId = useId();
   const extraFilesInputId = useId();
@@ -120,6 +138,7 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
     setBulkCandidates([]);
     setBulkSubmitting(false);
     setBulkDropHighlight(false);
+    setBulkProgress(initialBulkProgressState());
   };
 
   const appendPdfFiles = (incoming: File[]) => {
@@ -235,6 +254,7 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
     const trimmedName = input.name.trim();
     const pdfFiles = input.pdfFiles;
     const hasPdfs = pdfFiles.length > 0;
+    const deferRefresh = input.deferRefresh ?? false;
 
     input.onStage?.(hasPdfs ? "analyzing" : "saving");
     let analyzedWeeklyIncome: number | null = null;
@@ -320,7 +340,9 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
         }
       }
 
-      await refreshData();
+      if (!deferRefresh) {
+        await refreshData();
+      }
       return {
         name: duplicate.name,
         attachedToDuplicate: true,
@@ -345,7 +367,7 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
     };
     console.debug("[AddApplicantDialog] final applicant payload before save", applicantPayload);
 
-    const created = await addApplicant(applicantPayload);
+    const created = await addApplicant(applicantPayload, { skipRefresh: deferRefresh });
     let warningMessages: string[] = [];
 
     if (pdfFiles.length > 0) {
@@ -367,7 +389,9 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
         }
       }
 
-      await refreshData();
+      if (!deferRefresh) {
+        await refreshData();
+      }
       warningMessages = [
         ...uploadResult.failures.map((f) => `${f.filename}: ${f.message}`),
         localHasUnknownOrFailedReference ? "Some references or rental history could not be fully analyzed." : undefined,
@@ -454,12 +478,25 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
     }
 
     setBulkSubmitting(true);
+    const total = bulkCandidates.length;
+    setBulkProgress({
+      total,
+      processed: 0,
+      succeeded: 0,
+      failed: 0,
+      stageMessage: `Processing applicant 1 / ${total}`,
+    });
     let saved = 0;
     let attached = 0;
     const failures: string[] = [];
     const warnings: string[] = [];
 
-    for (const candidate of bulkCandidates) {
+    for (let index = 0; index < bulkCandidates.length; index += 1) {
+      const candidate = bulkCandidates[index];
+      setBulkProgress((prev) => ({
+        ...prev,
+        stageMessage: `Processing applicant ${index + 1} / ${total}`,
+      }));
       setBulkCandidates((prev) => prev.map((row) => (
         row.id === candidate.id ? { ...row, status: "saving", error: undefined } : row
       )));
@@ -472,6 +509,7 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
           pdfFiles: candidate.pdfFiles,
           historyNotes: "",
           agentNotes: "",
+          deferRefresh: true,
         });
         saved += result.attachedToDuplicate ? 0 : 1;
         attached += result.attachedToDuplicate ? 1 : 0;
@@ -479,13 +517,31 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
         setBulkCandidates((prev) => prev.map((row) => (
           row.id === candidate.id ? { ...row, status: "saved" } : row
         )));
+        setBulkProgress((prev) => ({
+          ...prev,
+          processed: prev.processed + 1,
+          succeeded: prev.succeeded + 1,
+        }));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Could not save applicant.";
         failures.push(`${candidate.name}: ${message}`);
         setBulkCandidates((prev) => prev.map((row) => (
           row.id === candidate.id ? { ...row, status: "error", error: message } : row
         )));
+        setBulkProgress((prev) => ({
+          ...prev,
+          processed: prev.processed + 1,
+          failed: prev.failed + 1,
+        }));
       }
+    }
+
+    setBulkProgress((prev) => ({ ...prev, stageMessage: "Refreshing applicant list..." }));
+    try {
+      await refreshData();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not refresh applicants after bulk upload.";
+      failures.push(`Applicant list refresh: ${message}`);
     }
 
     setBulkSubmitting(false);
@@ -517,7 +573,15 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
           <Button variant="accent" size="sm"><Plus /> Add applicant</Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+        onInteractOutside={(event) => {
+          if (bulkSubmitting) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (bulkSubmitting) event.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {step === "choice" ? "Add applicant" : step === "single" ? "Add single applicant" : "Bulk upload applicants"}
@@ -740,13 +804,27 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
               ) : null}
             </div>
 
+            {bulkSubmitting ? (
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-sm font-medium text-foreground">{bulkProgress.stageMessage}</p>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
+                  <p>Total: {bulkProgress.total}</p>
+                  <p>Processed: {bulkProgress.processed}</p>
+                  <p>Succeeded: {bulkProgress.succeeded}</p>
+                  <p>Failed: {bulkProgress.failed}</p>
+                </div>
+              </div>
+            ) : null}
+
             <input
               id={bulkFolderInputId}
               type="file"
               multiple
               {...{ webkitdirectory: "", directory: "" }}
               className="sr-only"
+              disabled={bulkSubmitting}
               onChange={(e) => {
+                if (bulkSubmitting) return;
                 const list = Array.from(e.target.files ?? []);
                 void appendBulkIntakeGroups(collectApplicantIntakeGroupsFromFileList(list)).catch(() => {
                   toast({
@@ -763,16 +841,19 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
               ref={bulkDropZoneRef}
               onDragOver={(e) => {
                 e.preventDefault();
+                if (bulkSubmitting) return;
                 e.dataTransfer.dropEffect = "copy";
                 setBulkDropHighlight(true);
               }}
               onDragLeave={(e) => {
+                if (bulkSubmitting) return;
                 const next = e.relatedTarget as Node | null;
                 if (next && bulkDropZoneRef.current?.contains(next)) return;
                 setBulkDropHighlight(false);
               }}
               onDrop={async (e) => {
                 e.preventDefault();
+                if (bulkSubmitting) return;
                 setBulkDropHighlight(false);
                 try {
                   const groups = await collectApplicantIntakeGroupsFromDataTransfer(e.dataTransfer);
@@ -789,7 +870,7 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
                 bulkDropHighlight
                   ? "border-primary bg-primary/5"
                   : "border-border bg-muted/30"
-              }`}
+              } ${bulkSubmitting ? "pointer-events-none opacity-60" : ""}`}
             >
               <Files className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-3 text-sm text-muted-foreground">
@@ -798,7 +879,9 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
               <div className="mt-4 flex justify-center">
                 <label
                   htmlFor={bulkFolderInputId}
-                  className="inline-flex h-9 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                  className={`inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground ${
+                    bulkSubmitting ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+                  }`}
                 >
                   Choose parent folder
                 </label>
@@ -897,7 +980,9 @@ export const AddApplicantDialog = ({ property, trigger }: Props) => {
                 Cancel
               </Button>
               <Button type="button" onClick={submitBulk} disabled={bulkSubmitting || bulkCandidates.length === 0}>
-                {bulkSubmitting ? "Saving applicants..." : "Save applicants"}
+                {bulkSubmitting
+                  ? bulkProgress.stageMessage || `Processing applicant ${bulkProgress.processed + 1} / ${bulkProgress.total}`
+                  : "Save applicants"}
               </Button>
             </DialogFooter>
           </div>
