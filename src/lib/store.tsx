@@ -41,6 +41,7 @@ interface DataStore {
   refreshData: () => Promise<Applicant[]>;
   addProperty: (p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
   updateProperty: (id: string, p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
+  deleteProperty: (id: string) => Promise<void>;
   addApplicant: (
     a: Omit<Applicant, "id" | "appliedAt" | "status">,
     options?: { skipRefresh?: boolean },
@@ -233,6 +234,45 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     [supabase, refreshData],
   );
 
+  const deleteProperty = useCallback<DataStore["deleteProperty"]>(
+    async (id) => {
+      if (!supabase) throw new Error("Supabase is not configured");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      let res: Response;
+      try {
+        res = await fetch(`/api/properties/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+      } catch {
+        throw new Error("Network error — check your connection and try again.");
+      }
+
+      const raw = await res.text();
+      let data: unknown;
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(res.ok ? "Invalid response from server." : `Could not delete property (${res.status}).`);
+      }
+
+      if (!res.ok) {
+        const msg =
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : `Could not delete property (${res.status}).`;
+        throw new Error(msg);
+      }
+
+      await refreshData();
+    },
+    [supabase, refreshData],
+  );
+
   const addApplicant = useCallback<DataStore["addApplicant"]>(
     async (a, options) => {
       if (!supabase) throw new Error("Supabase is not configured");
@@ -340,6 +380,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       refreshData,
       addProperty,
       updateProperty,
+      deleteProperty,
       addApplicant,
       updateApplicant,
       setApplicantStatus,
@@ -353,6 +394,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       refreshData,
       addProperty,
       updateProperty,
+      deleteProperty,
       addApplicant,
       updateApplicant,
       setApplicantStatus,

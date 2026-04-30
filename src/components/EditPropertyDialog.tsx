@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { UpgradeRequiredError } from "@/lib/billing/upgrade-required-error";
 import { Button } from "@/components/ui/button";
 import { ToastAction } from "@/components/ui/toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter as AlertDialogButtons,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +40,12 @@ export function EditPropertyDialog({
   property: Property;
   trigger: React.ReactNode;
 }) {
-  const { updateProperty } = useData();
+  const { updateProperty, deleteProperty } = useData();
   const { toast } = useToast();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [address, setAddress] = useState(property.address);
   const [suburb, setSuburb] = useState(property.suburb);
@@ -68,6 +83,7 @@ export function EditPropertyDialog({
       return;
     }
     try {
+      setSaving(true);
       await updateProperty(property.id, {
         address: address.trim(),
         suburb: suburb.trim(),
@@ -100,6 +116,26 @@ export function EditPropertyDialog({
         description: err instanceof Error ? err.message : "Unknown error",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteCurrentProperty = async () => {
+    try {
+      setDeleting(true);
+      await deleteProperty(property.id);
+      toast({ title: "Property deleted", description: `${property.address}, ${property.suburb} was removed.` });
+      setOpen(false);
+      router.push("/dashboard");
+    } catch (err) {
+      toast({
+        title: "Could not delete property",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -138,12 +174,39 @@ export function EditPropertyDialog({
           />
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving || deleting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={coverUploading}>
-              Save changes
-            </Button>
+            <div className="flex items-center gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="destructive" disabled={saving || deleting || coverUploading}>
+                    {deleting ? "Deleting..." : "Delete property"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this property?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This permanently deletes the property and all associated applicants. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogButtons>
+                    <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={deleteCurrentProperty}
+                      disabled={deleting}
+                    >
+                      {deleting ? "Deleting..." : "Delete property"}
+                    </AlertDialogAction>
+                  </AlertDialogButtons>
+                </AlertDialogContent>
+              </AlertDialog>
+              <Button type="submit" disabled={coverUploading || saving || deleting}>
+                {saving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
