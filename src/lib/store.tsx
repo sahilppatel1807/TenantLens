@@ -41,7 +41,10 @@ interface DataStore {
   refreshData: () => Promise<Applicant[]>;
   addProperty: (p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
   updateProperty: (id: string, p: Omit<Property, "id" | "createdAt">) => Promise<Property>;
-  addApplicant: (a: Omit<Applicant, "id" | "appliedAt" | "status">) => Promise<Applicant>;
+  addApplicant: (
+    a: Omit<Applicant, "id" | "appliedAt" | "status">,
+    options?: { skipRefresh?: boolean },
+  ) => Promise<Applicant>;
   updateApplicant: (id: string, a: ApplicantUpdatePatch) => Promise<Applicant>;
   setApplicantStatus: (id: string, status: ApplicantStatus) => Promise<void>;
   deleteApplicant: (id: string) => Promise<void>;
@@ -231,7 +234,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const addApplicant = useCallback<DataStore["addApplicant"]>(
-    async (a) => {
+    async (a, options) => {
       if (!supabase) throw new Error("Supabase is not configured");
       const insert = applicantToInsert({
         ...a,
@@ -239,7 +242,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       });
       const { data, error } = await supabase.from("applicants").insert(insert).select("*").single();
       if (error) throw toError(error);
-      await refreshData();
+      if (!options?.skipRefresh) {
+        await refreshData();
+      }
       return rowToApplicant(data);
     },
     [supabase, refreshData],
