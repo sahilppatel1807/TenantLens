@@ -66,17 +66,21 @@ export const ApplicantRow = ({
         <ApplicantStatusBadge status={applicant.status} />
       </div>
       <p className="mt-0.5 truncate text-sm text-muted-foreground">
-        {applicant.occupation} · ${applicant.weeklyIncome}/wk
+        {[applicant.occupation, `$${applicant.weeklyIncome}/wk`].filter(Boolean).join(" · ")}
       </p>
       <div className="mt-1 hidden flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground md:flex">
-        <span className="inline-flex items-center gap-1">
-          <Mail className="h-3 w-3" />
-          {applicant.email}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Phone className="h-3 w-3" />
-          {applicant.phone}
-        </span>
+        {applicant.email ? (
+          <span className="inline-flex items-center gap-1">
+            <Mail className="h-3 w-3" />
+            {applicant.email}
+          </span>
+        ) : null}
+        {applicant.phone ? (
+          <span className="inline-flex items-center gap-1">
+            <Phone className="h-3 w-3" />
+            {applicant.phone}
+          </span>
+        ) : null}
       </div>
     </div>
     <div className="hidden w-44 shrink-0 lg:block">

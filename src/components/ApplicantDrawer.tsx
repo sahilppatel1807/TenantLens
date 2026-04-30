@@ -135,8 +135,8 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
   const saveEdit = async () => {
     let hadPdfUpload = false;
     let latest = applicant;
-    if (!name.trim() || !email.trim()) {
-      toast({ title: "Missing details", description: "Name and email are required." });
+    if (!name.trim()) {
+      toast({ title: "Missing details", description: "Name is required." });
       return;
     }
     setSaving(true);
@@ -436,7 +436,9 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
             <div className="min-w-0 flex-1">
               <span className="block truncate text-xl font-semibold">{applicant.name}</span>
               <span className="mt-1 block truncate text-sm text-muted-foreground">
-                {applicant.occupation} · Applied {new Date(applicant.appliedAt).toLocaleDateString()}
+                {[applicant.occupation, `Applied ${new Date(applicant.appliedAt).toLocaleDateString()}`]
+                  .filter(Boolean)
+                  .join(" · ")}
               </span>
               <div className="mt-2">
                 <TierBadge tier={score.tier} />
@@ -458,14 +460,21 @@ export const ApplicantDrawer = ({ applicant, property, initialFocus = "overview"
         {mode === "overview" ? (
           <>
             <div className="mt-4 grid gap-2 rounded-xl bg-secondary/60 p-3 text-sm">
-              <a className="flex items-center gap-2 text-foreground hover:underline" href={`mailto:${applicant.email}`}>
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                {applicant.email}
-              </a>
-              <a className="flex items-center gap-2 text-foreground hover:underline" href={`tel:${applicant.phone}`}>
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                {applicant.phone}
-              </a>
+              {applicant.email ? (
+                <a className="flex items-center gap-2 text-foreground hover:underline" href={`mailto:${applicant.email}`}>
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  {applicant.email}
+                </a>
+              ) : null}
+              {applicant.phone ? (
+                <a className="flex items-center gap-2 text-foreground hover:underline" href={`tel:${applicant.phone}`}>
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  {applicant.phone}
+                </a>
+              ) : null}
+              {!applicant.email && !applicant.phone ? (
+                <span className="text-muted-foreground">No contact details provided.</span>
+              ) : null}
             </div>
 
             <Separator className="my-5" />
