@@ -101,3 +101,53 @@ export async function PATCH(request: Request, context: RouteCtx) {
 
   return NextResponse.json(data);
 }
+
+export async function DELETE(_request: Request, context: RouteCtx) {
+  const { id: propertyId } = context.params;
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
+  }
+
+  const { data: existing, error: loadErr } = await supabase
+    .from("properties")
+    .select("id, user_id")
+    .eq("id", propertyId)
+    .maybeSingle();
+
+  if (loadErr || !existing) {
+    return NextResponse.json({ error: "Property not found." }, { status: 404 });
+  }
+  if (existing.user_id !== user.id) {
+    return NextResponse.json({ error: "Property not found." }, { status: 404 });
+  }
+
+  const { error: deleteError } = await supabase
+    .from("properties")
+    .delete()
+    .eq("id", propertyId)
+    .eq("user_id", user.id);
+
+  if (deleteError) {
+    console.error("DELETE /api/properties/[id]:", deleteError.message);
+    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  }
+
+  const profile = await fetchProfileBilling(supabase, user.id);
+  if (hasPaidSubscription(profile)) {
+    const sync = await syncStripeSubscriptionQuantityForUser(supabase, user.id);
+    if (sync.ok === false) {
+      return NextResponse.json(
+        { error: sync.message, code: "STRIPE_SYNC_FAILED" },
+        { status: 502 },
+      );
+    }
+  }
+
+  return NextResponse.json({ ok: true });
+}
